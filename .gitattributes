@@ -1,0 +1,10 @@
+# Normalise to LF in the repository; check out however the platform wants.
+* text=auto
+
+*.py   text diff=python
+*.rst  text
+*.md   text
+*.toml text
+*.bat  text eol=crlf
+Makefile text eol=lf
+uv.lock text -diff
