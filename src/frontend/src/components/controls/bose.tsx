@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-import type { Settings } from "@/lib/types";
-
 import { Button, ConfirmButton, Row, Section, Select, Sensitive, Slider, Toggle } from "./primitives";
 import { useDevice } from "./use-device";
 
@@ -16,9 +14,9 @@ const TRANSPORT = [
 
 const signed = (value: number) => (value > 0 ? `+${value}` : String(value));
 
-export function BoseControls({ id, initial }: { id: string; initial: Settings }) {
-  const { settings, save, act, pending, error, notice } = useDevice(id, initial);
-  const [name, setName] = useState(initial.name ?? "");
+export function BoseControls({ id }: { id: string }) {
+  const { settings, save, act, pending, error, notice } = useDevice(id);
+  const [name, setName] = useState(settings.name ?? "");
   const actions = new Set(settings.actions);
 
   const currentSlot = settings.mode?.modes.find((mode) => mode.slot === settings.mode?.current);

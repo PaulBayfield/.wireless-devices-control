@@ -20,6 +20,16 @@ CHARGE_STATES = {0: ChargeState.CHARGING, 1: ChargeState.FULL,
 LED_ZONES = {"primary": 0, "logo": 1}
 LED_EFFECT_INDEX = {"off": 0, "static": 1, "breathe": 2, "cycle": 3}
 
+# Onboard profile layout (0x8100 memory), as Solaar documents it and as read
+# back from this mouse: byte 0 is the report rate, then the DPI list, and at
+# 0xD0 one 11-byte lighting entry per zone, in zone order.
+PROFILE_LED_OFFSET = 0xD0
+PROFILE_LED_SIZE = 11
+#: Profile lighting effect id -> name. Colour, where there is one, is bytes 1-3.
+PROFILE_LED_EFFECTS = {0x00: "off", 0x01: "static", 0x02: "breathe", 0x03: "cycle",
+                       0x0A: "breathe", 0x0B: "ripple"}
+_COLOURED = ("static", "breathe", "ripple")
+
 
 def voltage_to_percent(mv: int) -> int:
     volts = [v for v, _ in VOLTAGE_CURVE]
@@ -93,6 +103,26 @@ class G502(HidppDevice, core.Device):
     def get_onboard_mode(self) -> str:
         m = self.request(self.feature_index(0x8100), 2)[0]
         return {1: "onboard", 2: "host"}.get(m, f"unknown({m})")
+
+    def get_profile_leds(self) -> dict[str, dict]:
+        """Lighting stored in the active onboard profile, per zone.
+
+        What the LEDs show in onboard mode: ``{zone: {"effect", "color"}}``,
+        the colour as ``"rrggbb"`` or ``None`` for effects without one. Read
+        from profile memory (0x8100 fn 5, 16 bytes at a time).
+        """
+        idx = self.feature_index(0x8100)
+        sector = self.request(idx, 4)[0:2]
+        raw = b""
+        for offset in (PROFILE_LED_OFFSET, PROFILE_LED_OFFSET + 16):
+            raw += self.request(idx, 5, sector + offset.to_bytes(2, "big"))
+        leds = {}
+        for zone, index in LED_ZONES.items():
+            entry = raw[index * PROFILE_LED_SIZE:(index + 1) * PROFILE_LED_SIZE]
+            effect = PROFILE_LED_EFFECTS.get(entry[0], "unknown")
+            leds[zone] = {"effect": effect,
+                          "color": entry[1:4].hex() if effect in _COLOURED else None}
+        return leds
 
     def set_onboard_mode(self, mode: str):
         self.request(self.feature_index(0x8100), 1, bytes([{"onboard": 1, "host": 2}[mode]]))

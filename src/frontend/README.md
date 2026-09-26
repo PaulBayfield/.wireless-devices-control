@@ -40,3 +40,10 @@ on the machine the devices are connected to).
 port 3000. The image is built and pushed by
 `.github/workflows/deployment.yaml`; configure it at runtime with `API_URL`
 and `API_TOKEN`.
+
+## Device visuals
+
+Each device page shows the model's 3D view, else its picture, else its icon.
+Drop a `.glb` in `public/models/` or an image (transparent PNG/WebP) in
+`public/devices/`, then add a line for the model's key in `src/lib/visuals.ts`.
+3D models are shown with `<model-viewer>`, loaded only on a page that has one.

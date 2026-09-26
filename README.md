@@ -172,7 +172,6 @@ uv run __main__.py logitech features                # dump the HID++ feature tab
 
 ```
 __main__.py            the entry point
-assets/models/         3D models for the web UI (g502.glb)
 src/
   core/                what every vendor shares
     device.py          Device, the interface; FoundDevice, what discovery returns

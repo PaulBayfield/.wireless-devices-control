@@ -52,6 +52,14 @@ export interface ModeSlot {
   wind_block: boolean;
 }
 
+export interface ZoneLight {
+  effect: "off" | "static" | "breathe" | "cycle" | "ripple" | "unknown" | string;
+  /** "rrggbb", or null for effects without a colour. */
+  color: string | null;
+  /** "profile": the onboard profile holds it; "last set": set from here. */
+  source: "profile" | "last set";
+}
+
 /** Everything is optional: a device only reports the settings it has. */
 export interface Settings {
   name?: string | null;
@@ -71,7 +79,14 @@ export interface Settings {
   dpi?: { value: number; default: number; min: number; max: number; step: number };
   report_rate?: { value: number; supported: number[] };
   onboard_mode?: { value: string; modes: string[] };
-  led?: { zones: string[]; effects: string[] };
+  led?: {
+    zones: string[];
+    effects: string[];
+    /** What each zone shows now; null when unknown (host mode, nothing set yet). */
+    current: Record<string, ZoneLight> | null;
+    /** Where `current` comes from: one source for every zone, "mixed", or null when unknown. */
+    source: "profile" | "last set" | "mixed" | null;
+  };
 }
 
 export type SettingsChanges = Record<string, unknown>;

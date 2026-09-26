@@ -7,13 +7,26 @@ import type { Settings } from "@/lib/types";
 import { Button, Section, Select, Slider } from "./primitives";
 import { useDevice } from "./use-device";
 
-export function LogitechControls({ id, initial }: { id: string; initial: Settings }) {
-  const { settings, save, pending, error } = useDevice(id, initial);
-  const [led, setLed] = useState({
-    zone: initial.led?.zones[0] ?? "all",
-    effect: "static",
-    color: "#ffffff",
-  });
+/** The form's starting point for a zone: what it shows now, where known. */
+function ledForm(settings: Settings, zone: string) {
+  const light = settings.led?.current?.[zone === "all" ? "primary" : zone];
+  const effects = settings.led?.effects ?? [];
+  return {
+    zone,
+    effect: light && effects.includes(light.effect) ? light.effect : "static",
+    color: light?.color ? `#${light.color}` : "#ffffff",
+  };
+}
+
+const LIGHTING_HINTS = {
+  profile: "Showing the lighting stored in the onboard profile, which drives the LEDs in onboard mode.",
+  "last set": "Showing what was last set from here: the mouse cannot report its lighting.",
+  mixed: "Showing what was last set from here, and the onboard profile's lighting for the other zone.",
+};
+
+export function LogitechControls({ id }: { id: string }) {
+  const { settings, save, pending, error } = useDevice(id);
+  const [led, setLed] = useState(() => ledForm(settings, settings.led?.zones[0] ?? "all"));
   const hostMode = settings.onboard_mode?.value === "host";
 
   return (
@@ -65,12 +78,19 @@ export function LogitechControls({ id, initial }: { id: string; initial: Setting
         </Section>
 
         {settings.led && (
-          <Section title="Lighting" hint="The mouse does not report its current effect, so this only sets one.">
+          <Section
+            title="Lighting"
+            hint={
+              settings.led.source
+                ? LIGHTING_HINTS[settings.led.source]
+                : "The current lighting is unknown until it is set from here."
+            }
+          >
             <Select
               label="Zone"
               value={led.zone}
               options={settings.led.zones.map((zone) => ({ value: zone, label: zone }))}
-              onChange={(zone) => setLed({ ...led, zone })}
+              onChange={(zone) => setLed(ledForm(settings, zone))}
             />
             <Select
               label="Effect"
