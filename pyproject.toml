@@ -19,6 +19,9 @@ classifiers = [
 # Bose is standard library only; Logitech needs hidapi for the receiver.
 dependencies = [
     "hidapi>=0.15.0",
+    "python-dotenv>=1.2.2",
+    "sanic>=25.12.0",
+    "sanic-ext",
 ]
 
 [tool.uv]
@@ -26,6 +29,9 @@ dependencies = [
 # still creates the environment and resolves the groups below, it just does
 # not build a wheel out of src/.
 package = false
+
+[tool.uv.sources]
+sanic-ext = { git = "https://github.com/PaulBayfield/sanic-ext" }
 
 [dependency-groups]
 dev = [

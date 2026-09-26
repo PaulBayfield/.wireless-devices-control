@@ -3,11 +3,13 @@
     uv run __main__.py                  battery of every device (the default)
     uv run __main__.py battery --json   the same, as the server will see it
     uv run __main__.py devices          everything discovery finds, every vendor
+    uv run __main__.py serve            start the HTTP API for the web frontend
     uv run __main__.py bose ...         Bose commands      ('bose help')
     uv run __main__.py logitech ...     Logitech commands  ('logitech --help')
 
-The web server is the real interface; this exercises the same device layer
-from a terminal, so a protocol problem can be chased without a browser.
+The web frontend, through the API, is the real interface; this exercises the
+same device layer from a terminal, so a protocol problem can be chased
+without a browser.
 """
 
 import json
@@ -82,6 +84,14 @@ def cmd_devices(args):
     return 0
 
 
+def cmd_serve(args):
+    """Start the HTTP API, configured from .env (see .env.example)."""
+    from src.api import serve
+
+    serve()
+    return 0
+
+
 def cmd_bose(args):
     """Bose commands: status, volume, eq, cnc... ('bose help' lists them)."""
     from .bose.main import main
@@ -109,6 +119,7 @@ def cmd_help(args):
 COMMANDS = {
     "battery": cmd_battery,
     "devices": cmd_devices,
+    "serve": cmd_serve,
     "bose": cmd_bose,
     "logitech": cmd_logitech,
     "help": cmd_help,
