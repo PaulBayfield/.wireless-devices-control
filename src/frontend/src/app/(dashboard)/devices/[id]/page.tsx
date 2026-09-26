@@ -56,9 +56,6 @@ export default async function DevicePage({ params }: PageProps<"/devices/[id]">)
                 <span className={`size-2 rounded-full ${device.connected ? "bg-emerald-500" : "bg-zinc-400"}`} />
                 {device.connected ? "Connected" : "Not connected"}
               </p>
-              <p className="mt-1 truncate font-mono text-xs text-muted">
-                <Sensitive>{device.address}</Sensitive>
-              </p>
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4">
               <BatteryGauge battery={device.battery} stale={!device.connected} />
