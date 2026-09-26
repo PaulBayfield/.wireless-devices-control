@@ -74,7 +74,7 @@ export interface Settings {
   sidetone?: { level: string | null; levels: string[] };
   cnc?: { level: number | null; max: number };
   mode?: { current: number | null; modes: ModeSlot[] };
-  info?: { firmware: string | null; serial: string | null; mac: string | null };
+  info?: { firmware?: string | null; serial?: string | null; mac?: string | null; model?: string | null };
   // Logitech
   dpi?: { value: number; default: number; min: number; max: number; step: number };
   report_rate?: { value: number; supported: number[] };

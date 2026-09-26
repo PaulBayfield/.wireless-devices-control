@@ -14,12 +14,13 @@ Only settings the model actually has appear in ``read``, and only those are
 accepted by ``apply``, so a client can draw exactly what is in front of it.
 """
 
-from . import bose, logitech
+from . import bose, logitech, phonelink
 
 #: Vendor name to its controls module.
 CONTROLS = {
     "bose": bose,
     "logitech": logitech,
+    "phonelink": phonelink,
 }
 
 

@@ -89,6 +89,11 @@ export default async function DevicePage({ params }: PageProps<"/devices/[id]">)
           <BoseControls id={id} />
         ) : device.vendor === "logitech" ? (
           <LogitechControls id={id} />
+        ) : device.vendor === "phonelink" ? (
+          <p className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted">
+            {settings.info?.model ? `${settings.info.model}, read` : "Read"} through Phone Link on the device host.
+            There is nothing to change from here.
+          </p>
         ) : null}
       </main>
     </DeviceSettingsProvider>

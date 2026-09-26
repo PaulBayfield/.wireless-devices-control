@@ -38,6 +38,15 @@ export function SpeakerIcon(props: IconProps) {
   );
 }
 
+export function PhoneIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="6" y="2" width="12" height="20" rx="2.5" />
+      <path d="M11 18h2" />
+    </Icon>
+  );
+}
+
 export function MouseIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -51,6 +60,7 @@ export function DeviceIcon({ kind, ...props }: IconProps & { kind: string }) {
   if (kind === "headphones") return <HeadphonesIcon {...props} />;
   if (kind === "speaker") return <SpeakerIcon {...props} />;
   if (kind === "mouse") return <MouseIcon {...props} />;
+  if (kind === "phone") return <PhoneIcon {...props} />;
   return (
     <Icon {...props}>
       <rect x="4" y="4" width="16" height="16" rx="3" />

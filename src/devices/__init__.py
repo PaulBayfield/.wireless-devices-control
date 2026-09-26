@@ -6,6 +6,8 @@ Each vendor is its own package with its own protocol, transport and models:
     BMAP over Bluetooth RFCOMM
 :mod:`~.devices.logitech`
     HID++ 2.0 over a Lightspeed USB receiver
+:mod:`~.devices.phonelink`
+    a phone linked through Windows' Phone Link, read-only
 
 They meet in :func:`scan`, which asks each vendor what it can see and returns
 :class:`~src.core.device.FoundDevice` records that all open the same way.
@@ -22,10 +24,10 @@ Give the package a ``VENDOR`` name and a ``scan()`` returning
 from src.core.device import FoundDevice
 from src.core.errors import DeviceError
 
-from . import bose, logitech
+from . import bose, logitech, phonelink
 
 #: Every vendor package, in the order :func:`scan` asks them.
-VENDORS = (bose, logitech)
+VENDORS = (bose, logitech, phonelink)
 
 
 def scan(vendors=VENDORS):
@@ -45,4 +47,4 @@ def scan(vendors=VENDORS):
     return found
 
 
-__all__ = ["VENDORS", "FoundDevice", "scan", "bose", "logitech"]
+__all__ = ["VENDORS", "FoundDevice", "scan", "bose", "logitech", "phonelink"]
