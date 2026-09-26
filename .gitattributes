@@ -8,3 +8,4 @@
 *.bat  text eol=crlf
 Makefile text eol=lf
 uv.lock text -diff
+*.glb  binary

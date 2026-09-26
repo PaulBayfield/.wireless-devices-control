@@ -1,56 +1,33 @@
-"""BoseControl -- dependency-free control of Bose hardware over BMAP.
+"""Wireless Devices Control -- one place to manage every wireless device.
 
-It opens a Bluetooth RFCOMM socket and speaks BMAP, the same protocol the
-Bose app uses: no app, no cloud, no account. Everything is standard library.
+Each vendor's protocol was reverse engineered separately and lives in its own
+package; what they share is a thin interface, so the rest of the project can
+list devices and read their batteries without knowing who made them.
 
 Layout
 ------
 
-:mod:`~src.protocol`
-    the wire format: codec, parsers, builders
+:mod:`~src.core`
+    the shared interface: ``Device``, ``Battery``, ``DeviceError``
 :mod:`~src.devices`
-    the models, and the parent class they share
-:mod:`~src.transport`
-    RFCOMM, and finding what is paired
+    one package per vendor, and :func:`~src.devices.scan` across all of them
+:mod:`~src.devices.bose`
+    Bose headphones and speakers, over BMAP on Bluetooth RFCOMM
+:mod:`~src.devices.logitech`
+    Logitech mice, over HID++ 2.0 through a Lightspeed receiver
 :mod:`~src.cli`
-    the command line
-:mod:`~src.tools`
-    probing an unknown device, and replaying a sweep
-:mod:`~src.media`
-    what this PC is playing, via Windows
-:mod:`~src.output`
-    colours, rows and meters
+    the command line, for debugging the device layer
 
 Using it as a library
 ---------------------
 
 ::
 
-    from src import connect
+    from src.devices import scan
 
-    with connect() as dev:
-        print(dev.battery())
-        dev.set_volume(8)
-
-:func:`~src.transport.session.connect` finds a connected device,
-opens the right channel and returns the class that drives that model.
+    for found in scan():
+        with found.open() as dev:
+            print(found.name, dev.battery())
 """
 
-__version__ = "1.0.0"
-
-from .devices import Device
-from .protocol.errors import (
-    BmapConnectionError,
-    BmapDeviceError,
-    BmapError,
-    BmapNotFoundError,
-    BmapTimeoutError,
-    BmapUnsupported,
-)
-from .transport import connect
-
-__all__ = [
-    "__version__", "Device", "connect",
-    "BmapConnectionError", "BmapDeviceError", "BmapError",
-    "BmapNotFoundError", "BmapTimeoutError", "BmapUnsupported",
-]
+__version__ = "0.1.0"

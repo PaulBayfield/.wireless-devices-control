@@ -1,49 +1,44 @@
 [project]
-name = "bose-control"
-version = "1.0.0"
-description = "Dependency-free control of Bose hardware over BMAP, the protocol the Bose app speaks."
+name = "wireless-devices-control"
+version = "0.1.0"
+description = "Control wireless devices and watch their batteries: Bose over BMAP, Logitech over HID++."
 readme = "README.md"
-requires-python = ">=3.9"
-license = { text = "MIT" }
-keywords = ["bose", "bluetooth", "rfcomm", "bmap", "quietcomfort", "soundlink"]
+requires-python = ">=3.14"
+license = { file = "LICENSE" }
+keywords = ["bose", "logitech", "bluetooth", "rfcomm", "bmap", "hidpp", "battery"]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Topic :: Multimedia :: Sound/Audio",
     "Topic :: System :: Hardware",
 ]
 
-# Nothing here, and nothing planned: the whole client is standard library.
-dependencies = []
+# Bose is standard library only; Logitech needs hidapi for the receiver.
+dependencies = [
+    "hidapi>=0.15.0",
+]
 
 [tool.uv]
-# Run from the source tree rather than installed: `uv run main.py`. uv still
-# creates the environment and resolves the groups below, it just does not
-# build a wheel out of src/.
+# Run from the source tree rather than installed: `uv run __main__.py`. uv
+# still creates the environment and resolves the groups below, it just does
+# not build a wheel out of src/.
 package = false
 
 [dependency-groups]
-docs = [
-    "sphinx>=7.0",
-    "furo>=2024.1.29",
-    "myst-parser>=2.0",
-    "sphinx-copybutton>=0.5",
-]
 dev = [
     "ruff>=0.5",
 ]
 
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py314"
 src = ["."]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4"]
-# UP031/UP032: the codebase uses %-formatting throughout, deliberately -- it
-# reads better for the fixed-width tables this prints and runs on 3.9.
+# UP031/UP032: the Bose code uses %-formatting throughout, deliberately -- it
+# reads better for the fixed-width tables it prints.
 ignore = ["UP031", "UP032", "E501"]
