@@ -41,9 +41,9 @@ ZONES = {
 }
 #: The material whose mask holds the three DPI stripes.
 BARS_MATERIAL = "Material4"
-#: Bars fill from the bottom stripe up, like a gauge. On the model the bottom
-#: stripe is the smallest in the texture (its UVs are packed tighter).
-BARS_SMALLEST_FIRST = True
+#: Which stripe lights first, matching the real mouse: the largest in the
+#: texture (the top one on the model) first, the smallest last.
+BARS_SMALLEST_FIRST = False
 LOGITECH_BLUE = (56 / 255, 150 / 255, 209 / 255)
 UNLIT = np.array([34, 34, 36], dtype=float)
 

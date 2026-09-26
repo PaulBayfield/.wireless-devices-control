@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type HTMLAttributes, type Ref } from "reac
 
 import { visualFor } from "@/lib/visuals";
 
+import { Carousel } from "./carousel";
 import { useDeviceSettings } from "./controls/device-context";
 import { DeviceIcon } from "./icons";
 import { useBatteryBars, useModelLights, type ModelViewerElement } from "./use-model-lights";
@@ -34,8 +35,8 @@ declare module "react" {
 }
 
 /**
- * The device itself: its 3D model when there is one, else its picture, else
- * its icon. The 3D viewer (three.js, ~1 MB) is loaded only on a page that
+ * The device itself: its 3D model when there is one, else its photos, else
+ * its picture, else its icon. The 3D viewer (three.js, ~1 MB) is loaded only on a page that
  * shows a model. A model with LED zones is lit as the device reports them.
  */
 export function DeviceVisual({
@@ -106,9 +107,14 @@ export function DeviceVisual({
     );
   }
 
+  if (visual.gallery?.length) {
+    return <Carousel images={visual.gallery} />;
+  }
+
+  // Product photos come on white, so the card is white behind them in both themes.
   if (visual.image) {
     return (
-      <div className="relative h-full min-h-56 w-full">
+      <div className="relative h-full min-h-56 w-full bg-white">
         <Image src={visual.image} alt={name} fill sizes="(min-width: 768px) 400px, 100vw" className="object-contain p-4" priority />
       </div>
     );

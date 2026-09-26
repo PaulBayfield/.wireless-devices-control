@@ -2,8 +2,8 @@
  * What to show for each model, by its key (`qc45`, `g502`...).
  *
  * Files live in `public/`: 3D models (glTF binary, `.glb`) in
- * `public/models/`, images in `public/devices/`. A model without an entry,
- * or whose entry has neither, falls back to its icon.
+ * `public/models/`, images and photo galleries in `public/devices/`. A model
+ * without an entry, or whose entry has none of these, falls back to its icon.
  */
 
 export interface DeviceVisual {
@@ -11,6 +11,8 @@ export interface DeviceVisual {
   model?: string;
   /** A picture (transparent PNG or WebP works best). */
   image?: string;
+  /** Photos shown as a carousel, when there is no 3D model. */
+  gallery?: GalleryImage[];
   /** Initial camera angle for the 3D model, as model-viewer's camera-orbit. */
   orbit?: string;
   /**
@@ -21,6 +23,13 @@ export interface DeviceVisual {
   zones?: Record<string, string>;
   /** LED bars that show the battery level; see `BatteryBars`. */
   batteryBars?: BatteryBars;
+}
+
+export interface GalleryImage {
+  src: string;
+  alt: string;
+  /** "contain" for product shots on white, "cover" for photos that fill the frame. */
+  fit: "contain" | "cover";
 }
 
 /**
@@ -54,8 +63,18 @@ export const VISUALS: Record<string, DeviceVisual> = {
       thresholds: [30, 60], // 30 % and up: two bars; 60 % and up: three
     },
   },
-  // qc45: { model: "/models/qc45.glb" },         or { image: "/devices/qc45.png" }
-  // micro2: { image: "/devices/micro2.png" },
+  // Product photos from bose.com, 1500 px WebP.
+  qc45: { image: "/devices/qc45.webp" },
+  micro2: {
+    gallery: [
+      { src: "/devices/micro2-1.webp", alt: "SoundLink Micro (2nd Gen), front", fit: "contain" },
+      { src: "/devices/micro2-2.webp", alt: "SoundLink Micro (2nd Gen), three-quarter view", fit: "contain" },
+      { src: "/devices/micro2-3.webp", alt: "SoundLink Micro (2nd Gen), back and strap", fit: "contain" },
+      { src: "/devices/micro2-4.webp", alt: "SoundLink Micro (2nd Gen), angled", fit: "contain" },
+      { src: "/devices/micro2-5.webp", alt: "SoundLink Micro (2nd Gen), top", fit: "contain" },
+      { src: "/devices/micro2-6.webp", alt: "SoundLink Micro (2nd Gen), front with strap", fit: "contain" },
+    ],
+  },
 };
 
 export function visualFor(key: string): DeviceVisual {

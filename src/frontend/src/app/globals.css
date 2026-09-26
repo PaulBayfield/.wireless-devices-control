@@ -39,3 +39,11 @@ body {
 input[type="range"] {
   accent-color: var(--accent);
 }
+
+/* Scrollable strips that navigate by other means, like the photo carousel. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
