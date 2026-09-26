@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { Settings } from "@/lib/types";
 
-import { Button, ConfirmButton, Row, Section, Select, Slider, Toggle } from "./primitives";
+import { Button, ConfirmButton, Row, Section, Select, Sensitive, Slider, Toggle } from "./primitives";
 import { useDevice } from "./use-device";
 
 const TRANSPORT = [
@@ -183,11 +183,24 @@ export function BoseControls({ id, initial }: { id: string; initial: Settings })
             )}
           </div>
           {settings.source && settings.source.kind !== "none" && (
-            <Row label="Playing from" value={`${settings.source.kind}${settings.source.address ? ` · ${settings.source.address}` : ""}`} />
+            <Row
+              label="Playing from"
+              value={
+                <>
+                  {settings.source.kind}
+                  {settings.source.address && (
+                    <>
+                      {" · "}
+                      <Sensitive>{settings.source.address}</Sensitive>
+                    </>
+                  )}
+                </>
+              }
+            />
           )}
-          <Row label="Firmware" value={settings.info?.firmware} />
-          <Row label="Serial" value={settings.info?.serial} />
-          <Row label="MAC" value={settings.info?.mac} />
+          <Row label="Firmware" value={settings.info?.firmware} sensitive />
+          <Row label="Serial" value={settings.info?.serial} sensitive />
+          <Row label="MAC" value={settings.info?.mac} sensitive />
         </Section>
       </div>
     </div>

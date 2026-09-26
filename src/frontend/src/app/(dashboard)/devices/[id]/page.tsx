@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BatteryGauge } from "@/components/battery";
 import { BoseControls } from "@/components/controls/bose";
 import { LogitechControls } from "@/components/controls/logitech";
+import { Sensitive } from "@/components/controls/primitives";
 import { ChevronLeftIcon, DeviceIcon } from "@/components/icons";
 import { TimeAgo } from "@/components/time-ago";
 import { ApiError, getDevice, getSettings } from "@/lib/api";
@@ -46,7 +47,7 @@ export default async function DevicePage({ params }: PageProps<"/devices/[id]">)
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold">{device.name}</h1>
             <p className="text-sm text-muted">
-              {device.model} · {device.address} ·{" "}
+              {device.model} · <Sensitive>{device.address}</Sensitive> ·{" "}
               <span className={device.connected ? "text-emerald-600" : undefined}>
                 {device.connected ? "connected" : "not connected"}
               </span>

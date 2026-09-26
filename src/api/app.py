@@ -99,7 +99,7 @@ async def setup_app(app: Sanic):
         exit(1)
 
     app.ctx.devices = DeviceManager(
-        interval=int(environ.get("POLL_INTERVAL", 60)),
+        interval=int(environ.get("POLL_INTERVAL", 30)),
         logs=app.ctx.logs,
     )
 

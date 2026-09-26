@@ -176,11 +176,34 @@ class FeatureMethods:
         """Voice prompts as ``(enabled, language name)``."""
         return self.get("voice_prompts")
 
+    #: How long to wait for the reply to a prompts switch that never comes.
+    PROMPTS_REPLY_WAIT = 0.5
+
     def set_prompts(self, enabled):
-        """Turn voice prompts on or off, keeping the current language."""
+        """Turn voice prompts on or off, keeping the language and every other bit.
+
+        A QC45 applies a SETGET that *changes* the switch without answering
+        it (writing the value it already has is answered at once), so the
+        reply gets a short wait and the result is confirmed by reading the
+        setting back.
+
+        :raises BmapError: when the read-back does not show the change.
+        """
         payload = self.get_raw("voice_prompts")
-        language = payload[0] & 0x1F if payload else 0
-        self.set("voice_prompts", enabled, language)
+        link = self._link
+        saved = getattr(link, "timeout", None)
+        if saved is not None:
+            link.timeout = self.PROMPTS_REPLY_WAIT
+        try:
+            self.set("voice_prompts", enabled, payload[0] if payload else 0)
+        except BmapTimeoutError:
+            pass  # the usual case when the value changes; checked below
+        finally:
+            if saved is not None:
+                link.timeout = saved
+        if self.prompts()[0] != bool(enabled):
+            raise BmapError("%s did not switch voice prompts %s"
+                            % (self.NAME, "on" if enabled else "off"))
 
     def multipoint(self):
         """Whether two-device multipoint is on."""

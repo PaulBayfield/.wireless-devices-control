@@ -32,7 +32,12 @@ export async function updateSettings(id: string, changes: SettingsChanges): Prom
   }
 }
 
-/** A one-shot action: play, pause, power_off, pairing... */
+/**
+ * A one-shot action: play, pause, power_off, pairing...
+ *
+ * No `refresh()` afterwards: none of these change a setting the page shows,
+ * and re-rendering would re-read every setting over Bluetooth for nothing.
+ */
 export async function runAction(
   id: string,
   action: string,
@@ -44,6 +49,5 @@ export async function runAction(
   } catch (error) {
     return failure(error);
   }
-  refresh();
   return { ok: true };
 }

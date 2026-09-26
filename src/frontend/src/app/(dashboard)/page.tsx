@@ -5,8 +5,8 @@ import { ApiError, getDevices } from "@/lib/api";
 import { verifySession } from "@/lib/dal";
 import type { DevicesList } from "@/lib/types";
 
-/** How often the open dashboard re-reads the API's in-memory state. */
-const REFRESH_SECONDS = 30;
+/** How often the open dashboard re-reads the API's in-memory state (cheap: no device I/O). */
+const REFRESH_SECONDS = 15;
 
 export default async function DashboardPage() {
   await verifySession();

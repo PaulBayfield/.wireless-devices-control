@@ -208,11 +208,27 @@ export function ConfirmButton({
   );
 }
 
-export function Row({ label, value }: { label: string; value: ReactNode }) {
+/** Blurred until hovered or focused: identifiers that should not show on a screen share. */
+export function Sensitive({ children }: { children: ReactNode }) {
+  return (
+    <span
+      tabIndex={0}
+      title="Hover to reveal"
+      className="cursor-default blur-sm transition-[filter] duration-150 outline-none select-none hover:blur-none hover:select-auto focus:blur-none focus:select-auto"
+    >
+      {children}
+    </span>
+  );
+}
+
+export function Row({ label, value, sensitive = false }: { label: string; value: ReactNode; sensitive?: boolean }) {
+  const shown = value ?? "—";
   return (
     <div className="flex justify-between gap-4 text-sm">
       <span className="text-muted">{label}</span>
-      <span className="truncate font-mono text-xs leading-5">{value ?? "—"}</span>
+      <span className="truncate font-mono text-xs leading-5">
+        {sensitive && value != null ? <Sensitive>{shown}</Sensitive> : shown}
+      </span>
     </div>
   );
 }

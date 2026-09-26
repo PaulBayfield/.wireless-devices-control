@@ -42,9 +42,15 @@ def sidetone(level):
     return bytes([1, resolve(level, SIDETONE_VALUES, "sidetone level")])
 
 
-def prompts(enabled, language_id=0):
-    """``[1.3]`` SETGET payload: bit 5 is the switch, the low bits the language."""
-    return bytes([((1 if enabled else 0) << 5) | (language_id & 0x1F)])
+def prompts(enabled, current):
+    """``[1.3]`` SETGET payload: the byte the device reported, bit 5 flipped.
+
+    Bit 5 is the switch and the low bits the language, but a QC45 also sets
+    bit 7 (``a1`` for US English, on), whose meaning is unknown. Rebuilding the
+    byte from the switch and language alone drops it, and the headphones
+    never answered that -- so every other bit is echoed back as read.
+    """
+    return bytes([(current & ~0x20) | (0x20 if enabled else 0)])
 
 
 def standby16(minutes):

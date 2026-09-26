@@ -35,9 +35,6 @@ class RfcommTransport:
     _SETUP_ATTEMPTS = 4
     _SETUP_BACKOFF = 1.0
 
-    #: The firmware needs a beat between the request and the read.
-    _REPLY_DELAY = 0.2
-
     #: How long to keep reading once a drained exchange has started.
     _DRAIN_TIMEOUT = 0.5
 
@@ -160,12 +157,27 @@ class RfcommTransport:
         raise last
 
     def _send_recv_once(self, data, drain):
+        """Send, then read until one whole packet is in.
+
+        A reply carries its own length (byte 3), so the read ends as soon as
+        the packet is complete rather than after a fixed pause. A write can
+        be answered twice -- PROCESSING, then RESULT a moment later -- or
+        late, so stragglers are flushed before the request goes out, and a
+        packet for another address that still arrives before the answer is
+        skipped rather than taken for it.
+        """
         if not self._sock:
             raise BmapConnectionError("Not connected")
         try:
+            self._flush()
             self._sock.send(data)
-            time.sleep(self._REPLY_DELAY)
-            answer = self._sock.recv(4096)
+            answer = b""
+            while True:
+                while len(answer) < 4 or len(answer) < 4 + answer[3]:
+                    answer += self._recv_chunk()
+                if answer[:2] == data[:2]:
+                    break
+                answer = answer[4 + answer[3]:]  # someone else's packet
         except TimeoutError:
             raise BmapTimeoutError("No response from the device") from None
         except OSError as e:
@@ -184,6 +196,24 @@ class RfcommTransport:
             self._sock.settimeout(self.timeout)
 
         return answer
+
+    def _recv_chunk(self):
+        """One blocking read; an empty one means the device closed the link."""
+        chunk = self._sock.recv(4096)
+        if not chunk:
+            raise BmapConnectionError("The device closed the connection")
+        return chunk
+
+    def _flush(self):
+        """Discard whatever is already waiting on the socket, without blocking."""
+        self._sock.setblocking(False)
+        try:
+            while self._sock.recv(4096):
+                pass
+        except (BlockingIOError, OSError):
+            pass
+        finally:
+            self._sock.settimeout(self.timeout)
 
     @staticmethod
     def _is_get(data):
