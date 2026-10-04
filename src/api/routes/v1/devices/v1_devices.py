@@ -1,3 +1,6 @@
+import asyncio
+from datetime import UTC, datetime, timedelta
+
 from sanic import Blueprint, Request
 from sanic.response import JSONResponse
 from sanic_ext import openapi
@@ -17,6 +20,7 @@ from ....models.responses import (
     ActionParams,
     Device,
     Devices,
+    History,
     Message,
     Settings,
     SettingsChanges,
@@ -195,6 +199,67 @@ async def getDevice(request: Request, device_id: str) -> JSONResponse:
         request=request,
         success=True,
         data=_manager(request).get(device_id).to_dict(),
+        status=200,
+    ).generate()
+
+
+# /devices/<device_id>/history
+@bp.route("/devices/<device_id:str>/history", methods=["GET"])
+@openapi.definition(
+    summary="Battery history",
+    description=(
+        "How the battery level evolved over the last `hours`, and the charging phases in that window. "
+        "Read from disk, so it goes back further than the last start of the API.\n\n"
+        "`readings` are stretches of polls that returned the same level and state; one with `gap: true` "
+        "comes after a time the device was not read. `phases` group them by charging state. A device that "
+        "only reports a level (Bose) has its charging phases deduced from the level going up, marked "
+        "`inferred`."
+    ),
+    tag="Devices",
+    secured={"token": []},
+)
+@_ID_PARAMETER
+@openapi.parameter(
+    name="hours",
+    description="How far back to go, in hours. From 1 to `retention_days` x 24",
+    schema=int,
+    location="query",
+    required=False,
+    example=24,
+)
+@openapi.response(
+    status=200,
+    content={"application/json": History},
+    description="The battery history of the device.",
+)
+@_BAD_REQUEST_RESPONSE
+@_UNAUTHORIZED_RESPONSE
+@_NOT_FOUND_RESPONSE
+@_RATELIMITED_RESPONSE
+@ratelimit()
+async def getHistory(request: Request, device_id: str) -> JSONResponse:
+    """
+    Returns the battery history of a device.
+
+    :return: JSONResponse
+    """
+    history = request.app.ctx.history
+    longest = history.retention_days * 24
+
+    try:
+        hours = int(request.args.get("hours", 24))
+    except ValueError as e:
+        raise InvalidInput("'hours' must be a whole number.") from e
+    if not 1 <= hours <= longest:
+        raise InvalidInput(f"'hours' must be between 1 and {longest}.")
+
+    _manager(request).get(device_id)
+    until = datetime.now(UTC)
+
+    return JSON(
+        request=request,
+        success=True,
+        data=await asyncio.to_thread(history.read, device_id, until - timedelta(hours=hours), until),
         status=200,
     ).generate()
 

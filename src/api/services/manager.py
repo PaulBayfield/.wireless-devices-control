@@ -13,10 +13,13 @@ Every device exchange in the API goes through :class:`DeviceManager`:
   or a HID++ reply stream only makes sense with one conversation at a time.
   Vendors are independent hardware, so they do not wait on each other.
 
-Nothing is persisted: a restart polls again from scratch.
+The devices themselves are only held in memory, and a restart discovers
+them again from scratch. Battery readings are the exception: each one is
+also handed to :class:`~.history.BatteryHistory`, which keeps them on disk.
 """
 
 import asyncio
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -26,6 +29,7 @@ from src.core import Battery, Device, DeviceError, FoundDevice
 from src.devices import VENDORS
 
 from ..exceptions.devices import DeviceNotConnected, DeviceNotFound, DeviceUnreachable
+from .history import BatteryHistory
 
 
 def _now() -> datetime:
@@ -87,11 +91,13 @@ class DeviceManager:
 
     :param interval: seconds between two polls.
     :param logs: the app logger.
+    :param history: where every battery reading is recorded.
     """
 
-    def __init__(self, interval: int, logs) -> None:
+    def __init__(self, interval: int, logs, history: BatteryHistory) -> None:
         self.interval = interval
         self.logs = logs
+        self.history = history
         self.devices: dict[str, DeviceState] = {}
         #: When the last poll finished.
         self.polled_at: datetime | None = None
@@ -143,6 +149,10 @@ class DeviceManager:
                     continue
                 state.battery_at = state.seen_at = _now()
                 state.error = None
+                try:
+                    await asyncio.to_thread(self.history.record, item.id, state.battery, state.battery_at)
+                except sqlite3.Error as e:  # a reading not kept is no reason to stop polling
+                    self.logs.warning(f"{item.name}: battery reading not recorded: {e}")
 
             # Seen before, gone now (a Logitech mouse asleep): keep it, with
             # its last reading, but say it is not reachable.

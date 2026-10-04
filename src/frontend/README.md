@@ -1,7 +1,8 @@
 # Wireless Devices — frontend
 
 Next.js 16 (App Router) dashboard for the device API in `src/api`. It shows
-every device's battery, lowest first, and the settings each model has.
+every device's battery, lowest first, and on each device's page the history
+of its battery, with the charging phases, and the settings the model has.
 
 ## How it talks to the API
 

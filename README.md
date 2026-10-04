@@ -21,8 +21,8 @@ Three pieces, one device layer:
 ```
 
 - **The API** (`src/api/`) owns the hardware: it polls every battery in the
-  background, keeps the last reading of each device in memory, and exposes
-  settings and actions. It runs natively on the machine the devices are
+  background, keeps the last reading of each device in memory and the history
+  of them on disk, and exposes settings and actions. It runs natively on the machine the devices are
   connected to, since Docker cannot reach a Bluetooth radio.
 - **The frontend** (`src/frontend/`) is a Next.js app with a login. It calls
   the API from its server, so the token never reaches the browser.
@@ -63,14 +63,18 @@ uv run __main__.py serve
 
 Documentation (Scalar) is at `/`, the spec at `/openapi.json`; both are
 public, every other route needs `Authorization: Bearer <API_TOKEN>` (or
-`X-API-Key`). There is no database: one token from the environment, and the
-battery history is only what is in memory since the last start.
+`X-API-Key`). There is no database server and no account: one token from the
+environment, and the devices are rediscovered at every start. The one thing
+kept on disk is the battery history, in a SQLite file (`HISTORY_PATH`,
+`data/battery.db` by default) holding the last `HISTORY_DAYS` days, 90 by
+default.
 
 | Route | Description |
 | --- | --- |
 | `GET /v1/devices` | Every device seen since startup, with its last battery reading (from memory, instant) |
 | `POST /v1/devices/refresh` | Poll every device now |
 | `GET /v1/devices/<id>` | One device |
+| `GET /v1/devices/<id>/history?hours=24` | How the battery level evolved, and the charging phases |
 | `GET /v1/devices/<id>/settings` | Every setting the model has, read live, with the ranges to draw it |
 | `PATCH /v1/devices/<id>/settings` | Change some settings; returns them all, read back |
 | `POST /v1/devices/<id>/actions/<action>` | `play`, `pause`, `next`, `prev`, `power_off`, `pairing`... |
@@ -80,6 +84,13 @@ For the frontend server to reach it, set `API_HOST` to `0.0.0.0` or to a VPN
 address, and allow the port through the Windows firewall. The API speaks
 plain HTTP: put it on a VPN such as Tailscale (encrypted, and not exposed to
 the internet) rather than forwarding a port.
+
+**Battery history.** Every poll is recorded, as runs: one row for as long as
+the level and the charging state stay the same, so months of polls stay
+small. A device that was off, asleep or away leaves a hole instead of a flat
+line. The charging phases come from the state the device reports; Bose
+reports a level only, so its charges are deduced from the level going up, and
+marked `inferred`.
 
 It is a single process on purpose: one poller owns the radio and the
 receiver, with one lock per vendor so two exchanges never share a link.
@@ -193,7 +204,8 @@ src/
     components/        token auth, rate limiting, middleware, errors
     routes/v1/         devices and service blueprints
     models/            OpenAPI schemas
-    services/          the device manager (poller, locks) and per-vendor controls
+    services/          the device manager (poller, locks), the battery history
+                       (SQLite) and per-vendor controls
   cli/                 the debugging command line
     main.py            battery, devices, serve, and dispatch to a vendor
     bose/              the Bose commands

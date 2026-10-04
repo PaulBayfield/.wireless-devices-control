@@ -1,7 +1,8 @@
 /**
  * The device page while its settings are read from the device (up to a
  * couple of seconds over Bluetooth). Mirrors the page's layout -- the header
- * grid of name, battery and visual, then the settings sections -- so nothing
+ * grid of name, battery and visual, the battery history, then the settings
+ * sections -- so nothing
  * moves when the real content replaces it.
  */
 
@@ -61,6 +62,14 @@ export default function Loading() {
         </div>
         <Card className="min-h-56" />
       </div>
+
+      <Card className="mb-6 p-5">
+        <div className="flex items-center justify-between">
+          <Bar className="h-4 w-28" />
+          <Bar className="h-6 w-32" />
+        </div>
+        <Bar className="mt-4 h-[200px] w-full" />
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <SectionSkeleton rows={4} />

@@ -32,6 +32,9 @@ docs/api/_autosummary/
 # want it, after checking what is in it.
 captures/*.json
 
+# Battery history (SQLite)
+data/
+
 # OS
 Thumbs.db
 .DS_Store

@@ -30,6 +30,35 @@ export interface Device {
   error: string | null;
 }
 
+/** Consecutive polls that returned the same level and charging state. */
+export interface HistoryReading {
+  from: string;
+  to: string;
+  percent: number;
+  state: ChargeState;
+  millivolts: number | null;
+  /** The device was not read between the previous reading and this one. */
+  gap: boolean;
+}
+
+export interface HistoryPhase {
+  state: ChargeState;
+  /** Deduced from a rising level, on a device that does not report its charging state. */
+  inferred: boolean;
+  from: string;
+  to: string;
+  from_percent: number;
+  to_percent: number;
+}
+
+export interface BatteryHistory {
+  since: string;
+  until: string;
+  retention_days: number;
+  readings: HistoryReading[];
+  phases: HistoryPhase[];
+}
+
 export interface DevicesList {
   devices: Device[];
   polled_at: string | null;

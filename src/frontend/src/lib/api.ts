@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Device, DevicesList, Settings, SettingsChanges } from "./types";
+import type { BatteryHistory, Device, DevicesList, Settings, SettingsChanges } from "./types";
 
 /**
  * The device API client. Server-only: API_TOKEN never reaches the browser,
@@ -54,6 +54,10 @@ export function refreshDevices(): Promise<DevicesList> {
 
 export function getDevice(id: string): Promise<Device> {
   return request<Device>(`/v1/devices/${encodeURIComponent(id)}`);
+}
+
+export function getHistory(id: string, hours: number): Promise<BatteryHistory> {
+  return request<BatteryHistory>(`/v1/devices/${encodeURIComponent(id)}/history?hours=${hours}`);
 }
 
 export function getSettings(id: string): Promise<Settings> {

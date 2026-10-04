@@ -11,6 +11,7 @@ from .components.errors import ErrorHandler
 from .components.middleware import Middleware
 from .components.ratelimit import Ratelimiter
 from .config import AppConfig
+from .services.history import BatteryHistory
 from .services.manager import DeviceManager
 from .utils.logger import Logger
 
@@ -98,9 +99,20 @@ async def setup_app(app: Sanic):
         app.ctx.logs.info('Generate one with: uv run python -c "import secrets; print(secrets.token_urlsafe(32))"')
         exit(1)
 
+    interval = int(environ.get("POLL_INTERVAL", 30))
+
+    # A device that misses a couple of polls kept its level; one that misses
+    # more was away, and its history shows a hole rather than a flat line.
+    app.ctx.history = BatteryHistory(
+        path=environ.get("HISTORY_PATH", "data/battery.db"),
+        retention_days=int(environ.get("HISTORY_DAYS", 90)),
+        max_gap=max(3 * interval, 120),
+    )
+
     app.ctx.devices = DeviceManager(
-        interval=int(environ.get("POLL_INTERVAL", 30)),
+        interval=interval,
         logs=app.ctx.logs,
+        history=app.ctx.history,
     )
 
 
@@ -112,4 +124,5 @@ async def start_polling(app: Sanic):
 
 @app.listener("after_server_stop")
 async def close_app(app: Sanic):
+    app.ctx.history.close()
     app.ctx.logs.info("API stopped")

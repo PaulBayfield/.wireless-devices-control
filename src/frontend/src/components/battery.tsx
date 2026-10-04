@@ -10,7 +10,7 @@ export function batteryTone(percent: number | null): string {
   return "bg-red-500";
 }
 
-const STATE_LABELS: Record<string, string> = {
+export const STATE_LABELS: Record<string, string> = {
   charging: "Charging",
   full: "Charged",
   "not charging": "Plugged in, not charging",

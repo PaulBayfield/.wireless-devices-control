@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BatteryGauge } from "@/components/battery";
+import { BatteryHistory } from "@/components/battery-history";
 import { DeviceVisual } from "@/components/device-visual";
 import { BoseControls } from "@/components/controls/bose";
 import { DeviceSettingsProvider } from "@/components/controls/device-context";
@@ -9,9 +10,9 @@ import { LogitechControls } from "@/components/controls/logitech";
 import { Sensitive } from "@/components/controls/primitives";
 import { ChevronLeftIcon, DeviceIcon } from "@/components/icons";
 import { TimeAgo } from "@/components/time-ago";
-import { ApiError, getDevice, getSettings } from "@/lib/api";
+import { ApiError, getDevice, getHistory, getSettings } from "@/lib/api";
 import { verifySession } from "@/lib/dal";
-import type { Settings } from "@/lib/types";
+import type { BatteryHistory as History, Settings } from "@/lib/types";
 
 export default async function DevicePage({ params }: PageProps<"/devices/[id]">) {
   await verifySession();
@@ -26,15 +27,19 @@ export default async function DevicePage({ params }: PageProps<"/devices/[id]">)
   }
 
   // Read live from the device; a device that is away has no settings to show.
-  let settings: Settings | null = null;
-  let settingsError: string | null = null;
-  if (device.connected) {
-    try {
-      settings = await getSettings(id);
-    } catch (error) {
-      settingsError = error instanceof ApiError ? error.message : "Could not read the settings.";
-    }
-  }
+  // The history comes from the API's disk, so it is there whether the device is or not.
+  const [settingsRead, historyRead] = await Promise.allSettled([
+    device.connected ? getSettings(id) : null,
+    getHistory(id, 24),
+  ]);
+  const failed = (reason: unknown, fallback: string) => (reason instanceof ApiError ? reason.message : fallback);
+
+  const settings: Settings | null = settingsRead.status === "fulfilled" ? settingsRead.value : null;
+  const settingsError =
+    settingsRead.status === "rejected" ? failed(settingsRead.reason, "Could not read the settings.") : null;
+  const history: History | null = historyRead.status === "fulfilled" ? historyRead.value : null;
+  const historyError =
+    historyRead.status === "rejected" ? failed(historyRead.reason, "Could not read the battery history.") : null;
 
   return (
     <DeviceSettingsProvider initial={settings}>
@@ -74,6 +79,10 @@ export default async function DevicePage({ params }: PageProps<"/devices/[id]">)
               battery={device.battery?.percent}
             />
           </div>
+        </div>
+
+        <div className="mb-6">
+          <BatteryHistory id={id} initial={history} error={historyError} />
         </div>
 
         {!device.connected ? (

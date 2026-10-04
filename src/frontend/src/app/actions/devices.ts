@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 
 import * as api from "@/lib/api";
 import { verifySession } from "@/lib/dal";
-import type { ActionResult, Settings, SettingsChanges } from "@/lib/types";
+import type { ActionResult, BatteryHistory, Settings, SettingsChanges } from "@/lib/types";
 
 function failure(error: unknown): { ok: false; error: string } {
   return { ok: false, error: error instanceof Error ? error.message : "Something went wrong." };
@@ -20,6 +20,16 @@ export async function refreshDevices(): Promise<ActionResult> {
   }
   refresh();
   return { ok: true };
+}
+
+/** The battery history over another range than the one the page was rendered with. */
+export async function loadHistory(id: string, hours: number): Promise<ActionResult<BatteryHistory>> {
+  await verifySession();
+  try {
+    return { ok: true, data: await api.getHistory(id, hours) };
+  } catch (error) {
+    return failure(error);
+  }
 }
 
 /** Change some settings; returns them all, read back from the device. */
