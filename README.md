@@ -100,7 +100,7 @@ The agent opens no port: it connects out to the server, and the desktop app talk
 | Server | Node 24 running TypeScript directly, Hono 4 |
 | Database | SQLite: Node's built-in `node:sqlite` on the server, the agent's history |
 | Sign-in | OIDC with Authentik (authorization code + PKCE) |
-| Agent | Python 3.14, hidapi, built into one executable with PyInstaller |
+| Agent | Python 3.14, hidapi, built with PyInstaller into a folder installed with the desktop app |
 | Desktop | Tauri 2 (Rust) |
 
 
@@ -149,7 +149,7 @@ The desktop app configures its agent itself. Run on its own (a computer without 
 cp server/.env.example server/.env     # PUBLIC_URL=http://localhost:8830, DEV_LOGIN_USER=demo
 npm run server                         # API on :8830 (creates server/data/devices.db)
 npm run dev                            # web app on :1470
-npm run agent:build                    # the agent as one executable, for the desktop app
+npm run agent:build                    # the agent, built for the desktop app (src-tauri/binaries/)
 npm run tauri dev                      # the desktop app, which starts the agent
 ```
 
@@ -165,7 +165,8 @@ A computer without the desktop app can still run the agent on its own: Settings 
 - **Personal API keys** (`dvc_…`, Settings → Security) are for the desktop app and scripts, and are **read-only**: they read the devices and their history, and can't change anything. Creating keys, adding computers and managing users need a signed-in session, and so does merely listing keys, sessions or users.
 - **Agent keys** (`dva_…`, one per computer) can only report that computer's devices, and nothing else.
 - Keys and session cookies are random tokens; only their SHA-256 is stored. Cookie-authenticated writes must come from the app itself (`Origin` check).
-- The agent opens no port: only the desktop app that started it can talk to it (stdin/stdout).
+- The agent opens no port: only the desktop app that started it can talk to it (stdin/stdout). It runs from the install folder (`agent/devices-agent.exe`), and writes its log to `%APPDATA%\dev.bayfield.devicesgentgent.log`.
+- The installer isn't code-signed yet: SmartScreen asks to confirm it, and a behavioural antivirus (Kaspersky's System Watcher) may flag the app when it sets itself to start at sign-in. Restore it and add an exclusion for its folder, or report the false positive.
 - Linking a computer: the desktop app opens `/link` with the SHA-256 of a secret it keeps; a signed-in admin approves; the app claims the agent key with the secret. The key is created at that moment and never stored, and an approval nobody claims expires after 10 minutes.
 - The desktop app keeps the server address and its key in the OS credential store.
 - internal.bayfield.dev receives the data with a key that can only write it (`devices:write`), not read it back. The Bluetooth address is not sent.
