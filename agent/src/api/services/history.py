@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS battery_runs (
     millivolts  INTEGER
 );
 CREATE INDEX IF NOT EXISTS battery_runs_device ON battery_runs (device_id, ended_at);
+CREATE INDEX IF NOT EXISTS battery_runs_ended ON battery_runs (ended_at);
+-- How far devices.bayfield.dev has received the runs (see services/central.py).
+CREATE TABLE IF NOT EXISTS sync_state (
+    name  TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
+);
 """
 
 _UNKNOWN = ChargeState.UNKNOWN.value
@@ -182,6 +188,40 @@ class BatteryHistory:
                 self._db.execute("DELETE FROM battery_runs WHERE ended_at < ?",
                                  (now - self.retention_days * _DAY,))
                 self._pruned_at = now
+
+    # -- sync with devices.bayfield.dev ---------------------------------------
+
+    def runs_since(self, cursor: int, limit: int) -> list[dict]:
+        """Every run that ended at or after *cursor* (Unix seconds), oldest end first.
+
+        The open run of a device keeps moving its end, so it comes back at
+        every call: the server upserts runs by device and start, which makes
+        sending one twice harmless.
+        """
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT device_id, started_at, ended_at, percent, state, millivolts FROM battery_runs "
+                "WHERE ended_at >= ? ORDER BY ended_at LIMIT ?",
+                (cursor, limit),
+            ).fetchall()
+        return [
+            {"device_id": r[0], "started_at": r[1], "ended_at": r[2], "percent": r[3], "state": r[4],
+             "millivolts": r[5]}
+            for r in rows
+        ]
+
+    def cursor(self, name: str) -> int:
+        with self._lock:
+            row = self._db.execute("SELECT value FROM sync_state WHERE name = ?", (name,)).fetchone()
+        return row[0] if row else 0
+
+    def set_cursor(self, name: str, value: int) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                "INSERT INTO sync_state (name, value) VALUES (?, ?) "
+                "ON CONFLICT (name) DO UPDATE SET value = excluded.value",
+                (name, value),
+            )
 
     def read(self, device_id: str, since: datetime, until: datetime) -> dict:
         """The readings and charging phases of one device over a window.

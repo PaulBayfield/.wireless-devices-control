@@ -109,7 +109,10 @@ def _body(request: Request) -> dict:
     description=(
         "Every device seen since the API started, with its last battery reading. Answered from memory: "
         "batteries are polled in the background every `poll_interval` seconds, so this is instant. "
-        "A device that goes away keeps its last reading, with `connected: false`."
+        "A device that goes away keeps its last reading, with `connected: false`.\n\n"
+        "`?watch=1` says the Devices app is open: batteries are then read every second (`POLL_INTERVAL_ACTIVE`) "
+        "for the next 10 seconds. Otherwise the poll adapts between `POLL_INTERVAL_MIN` (a battery charging, low "
+        "or changing) and `POLL_INTERVAL` (everything steady)."
     ),
     tag="Devices",
     secured={"token": []},
@@ -124,10 +127,14 @@ def _body(request: Request) -> dict:
 @ratelimit()
 async def getDevices(request: Request) -> JSONResponse:
     """
-    Returns every known device and its last battery reading.
+    Returns every known device and its last battery reading. With `?watch=1`
+    (the Devices app, every few seconds while open), batteries are read every
+    second until it stops asking.
 
     :return: JSONResponse
     """
+    if request.args.get("watch") == "1":
+        _manager(request).watch()
     return JSON(
         request=request,
         success=True,

@@ -7,10 +7,12 @@ from sanic import Sanic
 
 from .components.auth import Auth
 from .components.blueprint import BlueprintLoader
+from .components.cors import DEFAULT_ORIGINS, Cors
 from .components.errors import ErrorHandler
 from .components.middleware import Middleware
 from .components.ratelimit import Ratelimiter
 from .config import AppConfig
+from .services.central import CentralLink
 from .services.history import BatteryHistory
 from .services.manager import DeviceManager
 from .utils.logger import Logger
@@ -82,6 +84,9 @@ app.ctx.ratelimiter = Ratelimiter()
 # Middleware registration
 Middleware(app)
 
+# The Devices app (web and desktop) controls this computer's devices from the browser
+Cors(app, [o.strip() for o in environ.get("CORS_ORIGINS", ",".join(DEFAULT_ORIGINS)).split(",") if o.strip()])
+
 # API token authentication registration
 Auth(app)
 
@@ -99,7 +104,11 @@ async def setup_app(app: Sanic):
         app.ctx.logs.info('Generate one with: uv run python -c "import secrets; print(secrets.token_urlsafe(32))"')
         exit(1)
 
-    interval = int(environ.get("POLL_INTERVAL", 30))
+    # Adaptive polling: every POLL_INTERVAL_ACTIVE s while the app is open here, every
+    # POLL_INTERVAL_MIN s while a battery moves (charging, low, changing), POLL_INTERVAL when steady.
+    interval = int(environ.get("POLL_INTERVAL", 60))
+    min_interval = int(environ.get("POLL_INTERVAL_MIN", 30))
+    active_interval = float(environ.get("POLL_INTERVAL_ACTIVE", 1))
 
     # A device that misses a couple of polls kept its level; one that misses
     # more was away, and its history shows a hole rather than a flat line.
@@ -113,13 +122,36 @@ async def setup_app(app: Sanic):
         interval=interval,
         logs=app.ctx.logs,
         history=app.ctx.history,
+        min_interval=min_interval,
+        active_interval=active_interval,
     )
 
 
 @app.listener("after_server_start")
 async def start_polling(app: Sanic):
     app.add_task(app.ctx.devices.run_forever(), name="device_poller")
-    app.ctx.logs.info(f"API started, polling devices every {app.ctx.devices.interval:g}s")
+    devices = app.ctx.devices
+    app.ctx.logs.info(
+        f"API started, polling devices every {devices.min_interval:g}-{devices.interval:g}s, "
+        f"{devices.active_interval:g}s while the app is open"
+    )
+
+    # devices.bayfield.dev: send every poll there, so the data follows you from computer to computer
+    central_url = environ.get("CENTRAL_URL", "").strip()
+    agent_key = environ.get("AGENT_KEY", "").strip()
+    if central_url and agent_key:
+        link = CentralLink(
+            url=central_url,
+            key=agent_key,
+            name=environ.get("AGENT_NAME", "").strip() or None,
+            manager=app.ctx.devices,
+            history=app.ctx.history,
+            logs=app.ctx.logs,
+        )
+        app.add_task(link.report_forever(), name="central_report")
+        app.ctx.logs.info(f"Reporting to {central_url} as '{link.name}'")
+    elif central_url or agent_key:
+        app.ctx.logs.warning("Set both CENTRAL_URL and AGENT_KEY to report to devices.bayfield.dev")
 
 
 @app.listener("after_server_stop")

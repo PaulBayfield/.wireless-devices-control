@@ -31,6 +31,13 @@ from src.devices import VENDORS
 from ..exceptions.devices import DeviceNotConnected, DeviceNotFound, DeviceUnreachable
 from .history import BatteryHistory
 
+#: Seconds the app counts as open after its last :meth:`DeviceManager.watch`.
+WATCH_TTL = 10
+#: Seconds between two discoveries while the app is open (batteries are read every poll).
+SCAN_EVERY = 30
+#: At or below this, a battery is watched more closely.
+LOW_BATTERY = 20
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -89,13 +96,28 @@ def _call(found: FoundDevice, fn: Callable[[Device], Any]) -> Any:
 class DeviceManager:
     """Discovery, battery polling, and serialized access to every device.
 
-    :param interval: seconds between two polls.
+    The polling rate adapts, to keep the data accurate without draining the
+    devices' batteries over Bluetooth:
+
+    - while the Devices app is open on this computer (it calls :meth:`watch`
+      every few seconds), batteries are read every *active_interval* second,
+      and discovery only runs every :data:`SCAN_EVERY` seconds;
+    - otherwise every *min_interval* seconds while something is moving
+      (a device charging, low, or whose level just changed), and every
+      *interval* seconds when everything is steady.
+
+    :param interval: seconds between two polls when every battery is steady (the longest).
     :param logs: the app logger.
     :param history: where every battery reading is recorded.
+    :param min_interval: seconds between two polls while a battery is moving.
+    :param active_interval: seconds between two polls while the app is open.
     """
 
-    def __init__(self, interval: int, logs, history: BatteryHistory) -> None:
+    def __init__(self, interval: int, logs, history: BatteryHistory, min_interval: float | None = None,
+                 active_interval: float = 1) -> None:
         self.interval = interval
+        self.min_interval = min(min_interval or interval, interval)
+        self.active_interval = active_interval
         self.logs = logs
         self.history = history
         self.devices: dict[str, DeviceState] = {}
@@ -103,22 +125,63 @@ class DeviceManager:
         self.polled_at: datetime | None = None
         self._locks = {vendor.VENDOR: asyncio.Lock() for vendor in VENDORS}
         self._refresh_lock = asyncio.Lock()
+        #: Called after every poll, e.g. to report it to devices.bayfield.dev.
+        self.listeners: list[Callable[[], None]] = []
+        #: Until when the app counts as open (event loop time), see :meth:`watch`.
+        self._watched_until = 0.0
+        self._wake = asyncio.Event()
+        self._scanned_at = 0.0
+        #: Whether a battery moved at the last poll (level or charging state).
+        self._moved = False
 
     # -- polling -------------------------------------------------------------
 
+    def watch(self) -> None:
+        """The app is open on this computer: poll fast for the next :data:`WATCH_TTL` seconds."""
+        idle = not self.watched
+        self._watched_until = asyncio.get_running_loop().time() + WATCH_TTL
+        if idle:
+            self._wake.set()  # cut the current idle wait short
+
+    @property
+    def watched(self) -> bool:
+        return asyncio.get_running_loop().time() < self._watched_until
+
+    def next_interval(self) -> float:
+        """Seconds until the next poll: fast while watched, then by how much the batteries move."""
+        if self.watched:
+            return self.active_interval
+        moving = self._moved or any(
+            s.found.connected and s.battery is not None
+            and (s.battery.state.value == "charging" or bool(s.battery.charging)
+                 or (s.battery.percent is not None and s.battery.percent <= LOW_BATTERY))
+            for s in self.devices.values()
+        )
+        return self.min_interval if moving else self.interval
+
     async def run_forever(self) -> None:
-        """Poll now, then every :attr:`interval` seconds, until cancelled."""
+        """Poll now, then again after :meth:`next_interval`, until cancelled."""
+        loop = asyncio.get_running_loop()
         while True:
+            started = loop.time()
+            # Discovery (Bluetooth enumeration, the HID receiver) is the slow part: while
+            # watched, only the batteries of known devices are read in between.
+            full = not self.watched or started - self._scanned_at >= SCAN_EVERY
             try:
-                await self.refresh()
+                await self.refresh(scan=full)
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # keep polling whatever one round did
                 self.logs.error(f"Poll failed: {e!r}")
-            await asyncio.sleep(self.interval)
+            self._wake.clear()
+            wait = max(self.next_interval() - (loop.time() - started), 0)
+            try:
+                await asyncio.wait_for(self._wake.wait(), timeout=wait)
+            except TimeoutError:
+                pass
 
-    async def refresh(self) -> None:
-        """Rediscover every vendor and read every connected battery.
+    async def refresh(self, scan: bool = True) -> None:
+        """Read every connected battery, rediscovering every vendor first unless *scan* is false.
 
         A refresh already running is waited for rather than doubled.
         """
@@ -126,16 +189,27 @@ class DeviceManager:
             async with self._refresh_lock:
                 return
         async with self._refresh_lock:
-            await asyncio.gather(*(self._refresh_vendor(v) for v in VENDORS))
+            before = {i: (s.battery.percent, s.battery.state) for i, s in self.devices.items() if s.battery}
+            await asyncio.gather(*(self._refresh_vendor(v, scan) for v in VENDORS))
+            if scan:
+                self._scanned_at = asyncio.get_running_loop().time()
             self.polled_at = _now()
+            after = {i: (s.battery.percent, s.battery.state) for i, s in self.devices.items() if s.battery}
+            self._moved = any(before.get(i, v) != v for i, v in after.items())
+        for listener in self.listeners:
+            listener()
 
-    async def _refresh_vendor(self, vendor) -> None:
+    async def _refresh_vendor(self, vendor, scan: bool = True) -> None:
         async with self._locks[vendor.VENDOR]:
-            try:
-                found = await asyncio.to_thread(vendor.scan)
-            except (DeviceError, OSError) as e:
-                self.logs.warning(f"{vendor.VENDOR}: discovery failed: {e}")
-                return
+            if scan:
+                try:
+                    found = await asyncio.to_thread(vendor.scan)
+                except (DeviceError, OSError) as e:
+                    self.logs.warning(f"{vendor.VENDOR}: discovery failed: {e}")
+                    return
+            else:
+                found = [s.found for s in self.devices.values()
+                         if s.found.vendor == vendor.VENDOR and s.found.connected]
 
             for item in found:
                 state = self.devices.setdefault(item.id, DeviceState(item))
@@ -153,6 +227,9 @@ class DeviceManager:
                     await asyncio.to_thread(self.history.record, item.id, state.battery, state.battery_at)
                 except sqlite3.Error as e:  # a reading not kept is no reason to stop polling
                     self.logs.warning(f"{item.name}: battery reading not recorded: {e}")
+
+            if not scan:
+                return
 
             # Seen before, gone now (a Logitech mouse asleep): keep it, with
             # its last reading, but say it is not reachable.
