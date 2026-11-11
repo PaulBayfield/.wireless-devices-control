@@ -73,8 +73,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: v${{ steps.get_version.outputs.version }}
         run: |
+          # release.yml (desktop installers) may have created it first: either one is fine.
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "$TAG is already released"
           else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes || gh release view "$TAG" > /dev/null
           fi

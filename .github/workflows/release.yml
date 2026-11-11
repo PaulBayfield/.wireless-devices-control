@@ -1,7 +1,8 @@
 name: release
 
 # Push a tag like v0.2.0 (matching "version" in package.json) to build the Windows desktop
-# installers and attach them to a draft GitHub release.
+# installers and attach them to that version's GitHub release (the one deployment.yaml publishes,
+# created here first if this build gets there before it).
 on:
   push:
     tags:
@@ -38,14 +39,15 @@ jobs:
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v1
+      - name: Build the installers
+        run: npm run tauri build
+
+      # The installer isn't code-signed: SmartScreen may ask to confirm (More info → Run anyway).
+      - name: Attach them to the release
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Devices ${{ github.ref_name }}
-          releaseBody: |
-            Windows installers: `Devices_*_x64-setup.exe` (recommended) or the `.msi`.
-            The installer isn't code-signed, so SmartScreen may ask you to confirm (More info → Run anyway).
-            Connect it with a personal API key from the web app (Settings → Security → API keys).
-          releaseDraft: true
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes || true
+          gh release upload "$TAG" src-tauri/target/release/bundle/nsis/*.exe src-tauri/target/release/bundle/msi/*.msi --clobber

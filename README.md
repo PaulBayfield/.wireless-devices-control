@@ -267,7 +267,7 @@ cp server/.env.example server/.env   # PUBLIC_URL, OIDC_*, INTERNAL_*
 docker compose up -d
 ```
 
-Pushing to `main` publishes `ghcr.io/paulbayfield/devices.bayfield.dev` (`latest` and the version) and a GitHub release when the version is new. Pushing a `v*` tag builds the Windows desktop installers into a draft release. Put the server behind the reverse proxy at `https://devices.bayfield.dev → localhost:8830`.
+Pushing to `main` publishes `ghcr.io/paulbayfield/devices.bayfield.dev` (`latest` and the version) and a GitHub release when the version is new. Pushing a `v*` tag builds the Windows desktop installers and attaches them to that version's release. Put the server behind the reverse proxy at `https://devices.bayfield.dev → localhost:8830`.
 
 
 ## ➕ • Adding a Device
