@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5b83d"/>
+      <stop offset="1" stop-color="#e0901c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <!-- Wireless waves -->
+  <path d="M332 268a256 256 0 0 1 360 0" fill="none" stroke="#ffffff" stroke-width="56" stroke-linecap="round" opacity=".55"/>
+  <path d="M400 340a160 160 0 0 1 224 0" fill="none" stroke="#ffffff" stroke-width="56" stroke-linecap="round" opacity=".8"/>
+  <!-- Battery -->
+  <rect x="212" y="436" width="560" height="336" rx="72" fill="#ffffff"/>
+  <rect x="786" y="548" width="52" height="112" rx="22" fill="#ffffff"/>
+  <!-- Charge bolt -->
+  <path d="M528 486 412 624h88l-26 104 128-150h-92z" fill="#e8981f"/>
+</svg>
