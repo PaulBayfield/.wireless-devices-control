@@ -1,15 +1,15 @@
-"""Wireless Devices Control -- the debugging command line.
+"""Devices agent -- the command line.
 
     uv run __main__.py                  battery of every device (the default)
     uv run __main__.py battery --json   the same, as the server will see it
     uv run __main__.py devices          everything discovery finds, every vendor
-    uv run __main__.py serve            start the HTTP API for the web frontend
+    uv run __main__.py serve            run the agent (poll, keep the history, report)
     uv run __main__.py bose ...         Bose commands      ('bose help')
     uv run __main__.py logitech ...     Logitech commands  ('logitech --help')
 
-The web frontend, through the API, is the real interface; this exercises the
-same device layer from a terminal, so a protocol problem can be chased
-without a browser.
+The Devices app is the real interface (it starts the agent itself, with
+`serve --ipc`); this exercises the same device layer from a terminal, so a
+protocol problem can be chased without it.
 """
 
 import json
@@ -85,10 +85,10 @@ def cmd_devices(args):
 
 
 def cmd_serve(args):
-    """Start the HTTP API, configured from .env (see .env.example)."""
-    from src.api import serve
+    """Run the agent, configured from .env (see .env.example); --ipc when the desktop app starts it."""
+    from src.agent.main import run
 
-    serve()
+    run(ipc="--ipc" in args)
     return 0
 
 

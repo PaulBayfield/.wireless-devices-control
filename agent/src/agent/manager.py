@@ -28,7 +28,7 @@ from typing import Any
 from src.core import Battery, Device, DeviceError, FoundDevice
 from src.devices import VENDORS
 
-from ..exceptions.devices import DeviceNotConnected, DeviceNotFound, DeviceUnreachable
+from .errors import DeviceNotConnected, DeviceNotFound, DeviceUnreachable
 from .history import BatteryHistory
 
 #: Seconds the app counts as open after its last :meth:`DeviceManager.watch`.

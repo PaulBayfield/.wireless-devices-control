@@ -10,10 +10,10 @@ class Logger:
         """
         Initialize the logger
         """
-        self.logger = logging.getLogger(f"WirelessAPI - {name}")
+        self.logger = logging.getLogger(f"devices - {name}")
         self.logger.setLevel(logging.DEBUG)
 
-        handler = logging.StreamHandler()
+        handler = logging.StreamHandler()  # stderr: stdout is the channel to the desktop app
         dt_fmt = "%Y-%m-%d %H:%M:%S"
         formatter = logging.Formatter(
             "[{asctime}] [{levelname:<8}] {name}: {message}", dt_fmt, style="{"

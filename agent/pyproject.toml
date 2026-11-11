@@ -1,7 +1,7 @@
 [project]
-name = "wireless-devices-control"
+name = "devices-agent"
 version = "0.1.0"
-description = "Control wireless devices and watch their batteries: Bose over BMAP, Logitech over HID++."
+description = "The Devices agent: polls wireless devices (Bose over BMAP, Logitech over HID++), keeps their battery history and sends it to devices.bayfield.dev."
 readme = "README.md"
 requires-python = ">=3.14"
 license = { file = "LICENSE" }
@@ -17,11 +17,10 @@ classifiers = [
 ]
 
 # Bose is standard library only; Logitech needs hidapi for the receiver.
+# The desktop app talks to the agent on stdin/stdout: no web framework.
 dependencies = [
     "hidapi>=0.15.0",
     "python-dotenv>=1.2.2",
-    "sanic>=25.12.0",
-    "sanic-ext",
 ]
 
 [tool.uv]
@@ -30,10 +29,10 @@ dependencies = [
 # not build a wheel out of src/.
 package = false
 
-[tool.uv.sources]
-sanic-ext = { git = "https://github.com/PaulBayfield/sanic-ext" }
-
 [dependency-groups]
+build = [
+    "pyinstaller>=6.22.3",
+]
 dev = [
     "ruff>=0.5",
 ]
