@@ -1,39 +1,53 @@
 # Secrets
 .env
+.env.local
+*.local
 
-# Python
+# --- Web app and server (Node) ---
+node_modules/
+dist/
+dist-ssr/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+npm-debug.log*
+logs/
+*.log
+
+# Local Postgres for development (npm --prefix server run db:dev)
+server/data/
+
+# --- Desktop app (Tauri) ---
+src-tauri/target/
+src-tauri/gen/
+
+# --- Agent (Python) ---
 __pycache__/
 *.py[cod]
 *.egg-info/
 build/
-dist/
 .venv/
 venv/
-
-# uv
 uv.lock.bak
-
-# Sphinx
-docs/_build/
-docs/api/_autosummary/
-
-# Tooling
 .ruff_cache/
 .mypy_cache/
 .pytest_cache/
 
-# Editors
-.vscode/
-.idea/
-*.swp
+# Battery history (SQLite) and logs of the agent
+agent/data/
+agent/logs/
+data/
 
 # Probe sweeps are machine-specific: they carry your device's serial number
 # and the Bluetooth addresses it remembers. Commit one deliberately if you
 # want it, after checking what is in it.
 captures/*.json
 
-# Battery history (SQLite)
-data/
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
 
 # OS
 Thumbs.db

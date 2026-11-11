@@ -1,12 +1,26 @@
 version: 2
 updates:
-  - package-ecosystem: "uv"
+  # Web app (and the desktop app's JavaScript side)
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
 
+  # Server
   - package-ecosystem: "npm"
-    directory: "/src/frontend"
+    directory: "/server"
+    schedule:
+      interval: "weekly"
+
+  # Agent
+  - package-ecosystem: "uv"
+    directory: "/agent"
+    schedule:
+      interval: "weekly"
+
+  # Desktop app (Rust side)
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
     schedule:
       interval: "weekly"
 

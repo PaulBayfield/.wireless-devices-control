@@ -1,40 +1,36 @@
-# Inspired from the official Github Documentation
-# https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#publishing-a-package-using-an-action
-#
-# Only the frontend is deployed as an image: the API has to run natively on the
-# machine the devices are connected to (Bluetooth radio, USB receiver).
-
 name: Production Deployment
+
+# The server image (web app + API). The agent is not deployed: it runs natively on each computer
+# the devices are connected to (Bluetooth radio, USB receiver).
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "src/frontend/**"
-      - ".github/workflows/deployment.yaml"
+    paths-ignore:
+      - "agent/**"
+      - "src-tauri/**"
+      - "**.md"
 
 env:
   REGISTRY: ghcr.io
-  # Set explicitly: the repository name starts with a dot, which an image name cannot.
-  IMAGE_NAME: paulbayfield/wireless-devices-control-frontend
+  # Set explicitly: the image keeps this name whatever the repository is called.
+  IMAGE_NAME: paulbayfield/devices.bayfield.dev
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write # create the release
       packages: write
-      attestations: write
-      id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
       - name: Log in to the Container registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -43,12 +39,12 @@ jobs:
       - name: Extract version from package.json
         id: get_version
         run: |
-          VERSION=$(node -p "require('./src/frontend/package.json').version")
+          VERSION=$(jq -r .version package.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -57,16 +53,28 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-        with:
-          driver: docker-container
 
       - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        uses: docker/build-push-action@v7
         with:
-          context: src/frontend
-          push: ${{ github.event_name != 'pull_request' }}
+          context: .
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.get_version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Settings → About compares the running version with the latest release, so publish one
+      # whenever package.json's version changes (once its image is pushed).
+      - name: Publish a GitHub release for a new version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.get_version.outputs.version }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "$TAG is already released"
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+          fi

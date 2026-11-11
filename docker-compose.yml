@@ -1,0 +1,32 @@
+services:
+  devices:
+    image: ghcr.io/paulbayfield/devices.bayfield.dev:latest
+    build: .
+    env_file: server/.env
+    environment:
+      DATABASE_URL: postgres://devices:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@devices-db:5432/devices
+      DATABASE_POOL_MAX: "10"
+    ports:
+      - "8830:8830"
+    depends_on:
+      devices-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  devices-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: devices
+      POSTGRES_USER: devices
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - devices-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devices -d devices"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  devices-db:
