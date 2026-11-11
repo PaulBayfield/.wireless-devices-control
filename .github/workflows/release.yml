@@ -39,6 +39,12 @@ jobs:
 
       - run: npm ci
 
+      # The agent, as one executable the desktop app bundles and starts (a Tauri sidecar).
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Build the agent
+        run: npm run agent:build
+
       - name: Build the installers
         run: npm run tauri build
 

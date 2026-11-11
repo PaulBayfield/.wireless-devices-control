@@ -10,7 +10,7 @@ import { PanelLeft, PanelRight, Refresh, WinMaximize, WinMinimize, X } from "./i
 
 export function Toolbar({ title, loading }: { title: ReactNode; loading?: boolean }) {
   const { t } = useSettings();
-  const { sidebarVisible, toggleSidebar, panelVisible, togglePanel, refresh, refreshing, local } = useApp();
+  const { sidebarVisible, toggleSidebar, panelVisible, togglePanel, refresh, refreshing } = useApp();
   return (
     <header className="toolbar" data-tauri-drag-region>
       {!sidebarVisible && (
@@ -29,7 +29,6 @@ export function Toolbar({ title, loading }: { title: ReactNode; loading?: boolea
           <Refresh size={14} />
         </span>
         <span className="hide-mobile">{refreshing ? t("refreshing") : t("refresh")}</span>
-        {local.agent && <span className="sr-only">{t("thisComputer")}</span>}
       </button>
       <button
         className={`icon-button panel-toggle${panelVisible ? " active" : ""}`}

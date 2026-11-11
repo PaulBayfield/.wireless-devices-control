@@ -3,7 +3,9 @@
 //! - The server address and personal API key are kept in the OS credential store (Windows
 //!   Credential Manager, macOS Keychain, Secret Service on Linux), never in the webview's storage.
 //! - A tray icon, close-to-tray, start at sign-in and a single instance (see shell.rs).
+//! - The agent, started with the app and kept running (see agent.rs).
 
+mod agent;
 mod shell;
 
 use serde::{Deserialize, Serialize};
@@ -56,18 +58,34 @@ pub fn run() {
         // the tray) just brings the running window back.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| shell::show_main_window(app)))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
+        .manage(agent::AgentState::default())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![shell::MINIMIZED_ARG]),
         ))
-        .setup(|app| Ok(shell::setup(app)?))
+        .setup(|app| {
+            shell::setup(app)?;
+            agent::start(app.handle());
+            Ok(())
+        })
         .on_window_event(shell::on_window_event)
         .invoke_handler(tauri::generate_handler![
             load_connection,
             save_connection,
             shell::set_close_to_tray,
-            shell::set_tray_labels
+            shell::set_tray_labels,
+            agent::agent_request,
+            agent::agent_info,
+            agent::agent_link,
+            agent::agent_unlink
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // The agent goes with the app (it would also stop on its own once its stdin closes).
+            if let tauri::RunEvent::Exit = event {
+                agent::shutdown(app);
+            }
+        });
 }

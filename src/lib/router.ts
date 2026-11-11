@@ -1,18 +1,21 @@
-// Address-bar routing: / is every device, /d/<id> one device, /c/<id> the devices of one computer.
+// Address-bar routing: / is every device, /d/<id> one device, /c/<id> the devices of one computer,
+// /link the page the desktop app opens to link its computer.
 
 import { useCallback, useEffect, useState } from "react";
 
-export type Route = { name: "devices"; host?: string } | { name: "device"; id: string };
+export type Route = { name: "devices"; host?: string } | { name: "device"; id: string } | { name: "link" };
 
 export function parseRoute(path: string): Route {
   const parts = path.replace(/^\/+|\/+$/g, "").split("/").map(decodeURIComponent);
   if (parts[0] === "d" && parts[1]) return { name: "device", id: parts[1] };
   if (parts[0] === "c" && parts[1]) return { name: "devices", host: parts[1] };
+  if (parts[0] === "link") return { name: "link" };
   return { name: "devices" };
 }
 
 export function routePath(r: Route): string {
   if (r.name === "device") return `/d/${encodeURIComponent(r.id)}`;
+  if (r.name === "link") return "/link";
   return r.host ? `/c/${encodeURIComponent(r.host)}` : "/";
 }
 

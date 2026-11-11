@@ -53,7 +53,7 @@ jobs:
       - run: uv sync --group dev
       - run: uv run ruff check .
       # Everything imports (the hardware is only touched once a device is opened).
-      - run: uv run python -c "import src.api.app"
+      - run: uv run python -c "import src.agent.main, src.cli.main"
 
   docker-build:
     runs-on: ubuntu-latest

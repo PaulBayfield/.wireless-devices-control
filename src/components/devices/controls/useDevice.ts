@@ -1,10 +1,9 @@
 import { createContext, useContext, useState } from "react";
 import type { Settings, SettingsChanges } from "../../../lib/api";
-import { applySettings, runAction, type AgentConnection } from "../../../lib/agent";
+import { applySettings, runAction } from "../../../lib/agent";
 
 export interface DeviceSettingsState {
   id: string;
-  agent: AgentConnection;
   settings: Settings;
   setSettings: (settings: Settings) => void;
 }
@@ -16,13 +15,13 @@ export interface DeviceSettingsState {
 export const DeviceSettingsContext = createContext<DeviceSettingsState | null>(null);
 
 /**
- * A device's settings, changed through this computer's agent. The settings shown are always the
+ * A device's settings, changed through this computer's agent (the desktop app's). The settings shown are always the
  * ones the device read back, never an optimistic guess that it may have refused.
  */
 export function useDevice() {
   const shared = useContext(DeviceSettingsContext);
   if (!shared) throw new Error("useDevice needs a DeviceSettingsContext");
-  const { id, agent, settings, setSettings } = shared;
+  const { id, settings, setSettings } = shared;
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -30,7 +29,7 @@ export function useDevice() {
   async function save(changes: SettingsChanges) {
     setPending(true);
     try {
-      setSettings(await applySettings(agent, id, changes));
+      setSettings(await applySettings(id, changes));
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -42,7 +41,7 @@ export function useDevice() {
   async function act(action: string, params: Record<string, unknown> = {}, done?: string) {
     setPending(true);
     try {
-      await runAction(agent, id, action, params);
+      await runAction(id, action, params);
       setError(null);
       setNotice(done ?? null);
     } catch (e) {

@@ -21,8 +21,8 @@ export function setConnection(c: { url: string; key: string } | null) {
 
 export const serverUrl = () => connection?.url ?? location.origin;
 
-export async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-  const headers: Record<string, string> = {};
+export async function api<T>(path: string, init?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<T> {
+  const headers: Record<string, string> = { ...init?.headers };
   if (init?.body !== undefined) headers["Content-Type"] = "application/json";
   if (connection) headers.Authorization = `Bearer ${connection.key}`;
   let res: Response;

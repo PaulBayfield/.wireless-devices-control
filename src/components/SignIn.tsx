@@ -30,7 +30,17 @@ export function SignIn({ error: initialError, onSignedIn }: { error: string | nu
         ) : (
           <>
             {config.oidc && (
-              <a className="primary-button large" href="/api/auth/oidc/start">
+              <a
+                className="primary-button large"
+                href="/api/auth/oidc/start"
+                onClick={() => {
+                  try {
+                    if (location.pathname !== "/") sessionStorage.setItem("devices.returnTo", location.pathname + location.search);
+                  } catch {
+                    // The page just won't come back after signing in.
+                  }
+                }}
+              >
                 {t("signInWith", { name: config.oidc.name })}
               </a>
             )}

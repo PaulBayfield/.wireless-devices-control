@@ -15,28 +15,28 @@ import { DeviceSettingsContext } from "./controls/useDevice";
 /** One device: the same page as before. Its data comes from the server; its settings from this computer's agent. */
 export function DevicePage({ device }: { device: Device }) {
   const { t, f } = useSettings();
-  const { local, isLocal, openSettings } = useApp();
+  const { local, isLocal } = useApp();
   const here = isLocal(device.id);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
 
   // Read live from the device, through the agent of this computer, when it has the device.
-  const canRead = here && device.connected && !!local.agent;
+  const canRead = here && device.connected && local.running;
   useEffect(() => {
     setSettings(null);
     setSettingsError(null);
-    if (!canRead || !local.agent) return;
+    if (!canRead) return;
     let live = true;
     setReading(true);
-    readSettings(local.agent, device.id).then(
+    readSettings(device.id).then(
       (s) => live && setSettings(s),
       (e: Error) => live && setSettingsError(e.message),
     ).finally(() => live && setReading(false));
     return () => {
       live = false;
     };
-  }, [canRead, local.agent, device.id]);
+  }, [canRead, device.id]);
 
   const status = device.connected ? t("connected") : device.host && !device.host.online ? t("offlineComputer", { name: device.host.name }) : t("notConnected");
 
@@ -81,13 +81,10 @@ export function DevicePage({ device }: { device: Device }) {
           {t("notConnectedSettings", { name: device.name })}
           {device.vendor === "bose" ? t("boseHint") : ""}
         </p>
-      ) : !local.agent ? (
-        <div className="card notice-card">
-          <p>{t("agentNeeded")}</p>
-          <button className="primary-button" onClick={() => openSettings("thisComputer")}>
-            {t("setUpAgent")}
-          </button>
-        </div>
+      ) : !local.available ? (
+        <p className="card muted">{t("controlInDesktop")}</p>
+      ) : !local.running ? (
+        <p className="card muted">{local.error ?? t("agentStarting")}</p>
       ) : !here ? (
         <p className="card muted">{t("otherComputer", { name: device.host?.name ?? "?" })}</p>
       ) : settingsError ? (
@@ -97,7 +94,7 @@ export function DevicePage({ device }: { device: Device }) {
           {reading && <Spinner />} {t("readingSettings")}
         </p>
       ) : (
-        <DeviceSettingsContext.Provider value={{ id: device.id, agent: local.agent, settings, setSettings }}>
+        <DeviceSettingsContext.Provider value={{ id: device.id, settings, setSettings }}>
           {device.vendor === "bose" ? <BoseControls /> : device.vendor === "logitech" ? <LogitechControls /> : null}
         </DeviceSettingsContext.Provider>
       )}

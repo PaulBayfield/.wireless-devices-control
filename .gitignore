@@ -20,6 +20,8 @@ server/data/
 # --- Desktop app (Tauri) ---
 src-tauri/target/
 src-tauri/gen/
+# The agent's executable, built by `npm run agent:build`
+src-tauri/binaries/
 
 # --- Agent (Python) ---
 __pycache__/

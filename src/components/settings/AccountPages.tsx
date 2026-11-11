@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, isTauri, serverUrl, type ApiKey, type Session } from "../../lib/api";
-import { DEFAULT_AGENT_URL, agentCall, loadAgent, saveAgent } from "../../lib/agent";
-import { getAutostart, setAutostart } from "../../lib/desktop";
+import { api, ApiError, isTauri, serverUrl, type ApiKey, type Session } from "../../lib/api";
+import { linkThisComputer, unlinkAgent } from "../../lib/agent";
+import { getAutostart, openExternal, setAutostart } from "../../lib/desktop";
 import { useApp } from "../../lib/app";
 import { invalidate, useApi } from "../../lib/hooks";
 import { useSettings, type Settings, type Theme } from "../../lib/settings";
@@ -128,65 +128,91 @@ function DesktopPreferences() {
   );
 }
 
-// --- This computer (the local agent) ---
+// --- This computer: the agent the desktop app runs ---
 
 export function ThisComputerPage() {
+  return isTauri ? <ThisComputerDesktop /> : <ThisComputerWeb />;
+}
+
+/** In a browser there is no agent: the desktop app brings it. */
+function ThisComputerWeb() {
   const { t } = useSettings();
-  const { local } = useApp();
+  return (
+    <>
+      <PageHeader title={t("thisComputer")} hint={t("thisComputerHint")} />
+      <p className="small muted">{t("controlInDesktop")}</p>
+      <a className="primary-button" href="https://github.com/PaulBayfield/devices.bayfield.dev/releases/latest" target="_blank" rel="noreferrer">
+        {t("getDesktop")}
+      </a>
+    </>
+  );
+}
+
+function ThisComputerDesktop() {
+  const { t } = useSettings();
+  const { local, reloadOverview } = useApp();
   const toast = useToast();
-  const saved = loadAgent();
-  const [url, setUrl] = useState(saved?.url ?? DEFAULT_AGENT_URL);
-  const [token, setToken] = useState(saved?.token ?? "");
-  const [busy, setBusy] = useState(false);
+  const [linking, setLinking] = useState<AbortController | null>(null);
+  const info = local.info;
+
+  const link = async () => {
+    const abort = new AbortController();
+    setLinking(abort);
+    try {
+      const name = await linkThisComputer(
+        serverUrl(),
+        info?.computer ?? "This computer",
+        openExternal,
+        async (secret) => {
+          try {
+            return await api<{ hostId: string; name: string; key: string }>("/app/link/claim", { headers: { "X-Link-Secret": secret } });
+          } catch (e) {
+            if (e instanceof ApiError && e.status === 404) return null; // not approved yet
+            throw e;
+          }
+        },
+        abort.signal,
+      );
+      toast(t("linkedAs", { name }));
+      local.reloadInfo();
+      reloadOverview();
+    } catch (e) {
+      if (!abort.signal.aborted) toast((e as Error).message, "error");
+    } finally {
+      setLinking(null);
+    }
+  };
 
   return (
     <>
       <PageHeader title={t("thisComputer")} hint={t("thisComputerHint")} />
-      <form
-        className="settings-rows"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          try {
-            const c = { url: url.trim().replace(/\/+$/, ""), token: token.trim() };
-            const list = await agentCall<{ devices: unknown[] }>(c, "/devices");
-            saveAgent(c);
-            local.recheck();
-            toast(t("agentOk", { n: list.devices.length }));
-          } catch (err) {
-            toast((err as Error).message, "error");
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <Row label={t("agentAddress")} stack>
-          <input className="text-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_AGENT_URL} spellCheck={false} />
+      <section className="settings-rows">
+        <Row label={info?.computer ?? "…"} hint={local.running ? t("agentRunning", { n: local.devices?.size ?? 0 }) : (local.error ?? t("agentStarting"))}>
+          <span className={`status-dot${local.running ? " on" : ""}`} />
         </Row>
-        <Row label={t("agentToken")} hint={t("agentTokenHint")} stack>
-          <input className="text-field" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} />
-        </Row>
-        <div className="settings-actions">
-          {saved && (
+        <Row label={t("serverLink")} hint={info?.link ? t("linkedTo", { name: info.link.name, server: info.link.server }) : t("notLinked")}>
+          {info?.link ? (
             <button
-              type="button"
               className="text-button"
-              onClick={() => {
-                saveAgent(null);
-                setToken("");
+              onClick={async () => {
+                await unlinkAgent();
+                local.reloadInfo();
               }}
             >
-              {t("agentForget")}
+              {t("unlink")}
+            </button>
+          ) : linking ? (
+            <button className="text-button" onClick={() => linking.abort()}>
+              {t("cancel")}
+            </button>
+          ) : (
+            <button className="primary-button" onClick={() => void link()}>
+              {t("linkComputer")}
             </button>
           )}
-          <button className="primary-button" disabled={busy || !url.trim() || !token.trim()}>
-            {t("connect")}
-          </button>
-        </div>
-        {local.agent && (
-          <p className={`small ${local.error ? "error-text" : "muted"}`}>{local.error ?? (local.ids ? t("agentOk", { n: local.ids.size }) : t("loading"))}</p>
-        )}
-      </form>
+        </Row>
+      </section>
+      {linking && <p className="small muted">{t("linkWaiting")}</p>}
     </>
   );
 }

@@ -828,6 +828,28 @@
   display: flex;
 }
 
+/* ---------- Link page ---------- */
+
+.link-card {
+  max-width: 440px;
+  margin: 0 auto;
+}
+.link-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+}
+.link-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 1000px) {

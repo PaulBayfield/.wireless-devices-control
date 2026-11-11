@@ -16,6 +16,7 @@ import { Toolbar } from "./components/Toolbar";
 import { Dashboard } from "./components/devices/Dashboard";
 import { DevicePage } from "./components/devices/DevicePage";
 import { DevicePanel } from "./components/devices/DevicePanel";
+import { LinkPage } from "./components/devices/LinkPage";
 
 export default function App() {
   return (
@@ -126,7 +127,7 @@ function Shell({ me, setMe, router, onSignedOut }: { me: Me; setMe: (me: Me) => 
     setRefreshing(true);
     try {
       // The local agent polls at once and reports; the server then has the new readings.
-      if (local.agent) await refreshAgent(local.agent);
+      if (local.running) await refreshAgent();
       await new Promise((resolve) => setTimeout(resolve, 600));
       reloadOverview();
     } catch (e) {
@@ -229,7 +230,9 @@ function Shell({ me, setMe, router, onSignedOut }: { me: Me; setMe: (me: Me) => 
 
   const listTitle = list === "low" ? t("lowBattery") : list === "charging" ? t("charging") : t("allDevices");
   const title =
-    r.name === "device" ? (
+    r.name === "link" ? (
+      t("linkTitle")
+    ) : r.name === "device" ? (
       <>
         <button className="crumb" onClick={() => openDevice(null)}>
           {t("devices")}
@@ -254,7 +257,13 @@ function Shell({ me, setMe, router, onSignedOut }: { me: Me; setMe: (me: Me) => 
           <Toolbar title={title} loading={overviewReq.loading && !overview} />
           <div className="content">
             {overviewReq.error && !overview && <p className="notice error page-notice">{overviewReq.error}</p>}
-            {r.name === "device" ? device ? <DevicePage key={device.id} device={device} /> : overview && <p className="page muted">{t("noResults")}</p> : <Dashboard />}
+            {r.name === "link" ? (
+              <LinkPage />
+            ) : r.name === "device" ? (
+              device ? <DevicePage key={device.id} device={device} /> : overview && <p className="page muted">{t("noResults")}</p>
+            ) : (
+              <Dashboard />
+            )}
           </div>
         </main>
         {panelVisible && <DevicePanel device={device} />}
