@@ -58,7 +58,8 @@ app.use(
   "/api/*",
   cors({
     origin: (origin) => (DESKTOP_ORIGINS.includes(origin) || (process.env.NODE_ENV !== "production" && /^http:\/\/localhost:\d+$/.test(origin)) ? origin : null),
-    allowHeaders: ["Authorization", "Content-Type"],
+    // X-Link-Secret: the desktop app claiming its agent key (see /api/app/link/claim).
+    allowHeaders: ["Authorization", "Content-Type", "X-Link-Secret"],
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
     maxAge: 600,
   }),
