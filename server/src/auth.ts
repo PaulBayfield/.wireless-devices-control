@@ -233,7 +233,7 @@ async function oidcUser(claims: Claims): Promise<User> {
     if (byName) return claim(byName);
   }
 
-  const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM users`;
+  const [{ count }] = await sql<{ count: number }[]>`SELECT count(*) AS count FROM users`;
   if (count > 0 && !cfg.autoCreate) throw new HttpError(403, "No Devices account matches yours. Ask an admin to create one.");
   const id = await freeUsername(claims.preferred_username || email?.split("@")[0] || "user");
   const [emailTaken] = email ? await sql`SELECT 1 FROM users WHERE lower(email) = ${email}` : [];
@@ -332,7 +332,7 @@ authRoutes.post("/dev-login", async (c) => {
   if (!DEV_LOGIN_USER) throw new HttpError(404, "Not found");
   let user = await getUser(DEV_LOGIN_USER);
   if (!user) {
-    const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM users`;
+    const [{ count }] = await sql<{ count: number }[]>`SELECT count(*) AS count FROM users`;
     await sql`INSERT INTO users (id, name, role) VALUES (${DEV_LOGIN_USER}, ${DEV_LOGIN_USER}, ${count === 0 ? "admin" : "viewer"})`;
     user = (await getUser(DEV_LOGIN_USER))!;
   }

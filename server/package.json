@@ -3,24 +3,21 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Devices API: gathers the agents' reports and forwards them to internal.bayfield.dev",
+  "description": "Devices API: gathers the agents' reports in a SQLite file and forwards them to internal.bayfield.dev",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.ts",
-    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
-    "check": "tsc --noEmit",
-    "db:dev": "node scripts/dev-db.ts"
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/index.ts",
+    "dev": "node --disable-warning=ExperimentalWarning --watch --env-file-if-exists=.env src/index.ts",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "hono": "^4.13.13",
-    "postgres": "^3.4.9"
+    "hono": "^4.13.13"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "embedded-postgres": "^18.4.0-beta.17",
     "typescript": "~7.0.2"
   }
 }

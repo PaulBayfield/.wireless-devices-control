@@ -133,7 +133,7 @@ agent.post("/report", async (c) => {
           millivolts = EXCLUDED.millivolts,
           host_id = EXCLUDED.host_id,
           updated_at = now()
-        WHERE battery_runs.ended_at < EXCLUDED.ended_at OR battery_runs.millivolts IS DISTINCT FROM EXCLUDED.millivolts`;
+        WHERE battery_runs.ended_at < EXCLUDED.ended_at OR battery_runs.millivolts IS NOT excluded.millivolts`;
     }
   });
 

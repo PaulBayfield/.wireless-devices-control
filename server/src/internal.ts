@@ -21,11 +21,11 @@ const MAX_RETRY_S = 90;
 const CURSOR = "internal_runs_cursor";
 const STATUS = "internal_status";
 
-/** Where the last sync stopped, as Postgres timestamps in text (microseconds kept). */
+/** Where the last sync stopped (times in Unix milliseconds, as stored). */
 interface Cursor {
-  updatedAt: string;
+  updatedAt: number;
   deviceId: string;
-  startedAt: string;
+  startedAt: number;
 }
 
 export interface InternalStatus {
@@ -82,15 +82,13 @@ export function syncInternal(): Promise<InternalStatus> {
       const settled = new Date(Date.now() - SETTLE_MS);
       for (;;) {
         // Keyset pagination on (updated_at, device_id, started_at): no run is skipped or sent forever.
-        // The cursor keeps Postgres' microseconds (as text): a JS Date would cut them, and a whole batch
-        // shares one updated_at, so it would come back again and again. Sent as text: postgres.js would turn
-        // a parameter typed timestamptz into a Date, cutting them again.
-        const rows = await sql<{ deviceId: string; hostId: string | null; startedAt: Date; endedAt: Date; percent: number; state: string; millivolts: number | null; cursorUpdated: string; cursorStarted: string }[]>`
+        // A whole batch of runs shares one updated_at, hence the device and start in the cursor.
+        const rows = await sql<{ deviceId: string; hostId: string | null; startedAt: Date; endedAt: Date; percent: number; state: string; millivolts: number | null; cursorUpdated: number; cursorStarted: number }[]>`
           SELECT device_id, host_id, started_at, ended_at, percent, state, millivolts,
-                 updated_at::text AS cursor_updated, started_at::text AS cursor_started
+                 updated_at AS cursor_updated, started_at AS cursor_started
           FROM battery_runs
           WHERE updated_at < ${settled}
-            ${cursor ? sql`AND (updated_at, device_id, started_at) > (${cursor.updatedAt}::text::timestamptz, ${cursor.deviceId}, ${cursor.startedAt}::text::timestamptz)` : sql``}
+            ${cursor ? sql`AND (updated_at, device_id, started_at) > (${cursor.updatedAt}, ${cursor.deviceId}, ${cursor.startedAt})` : sql``}
           ORDER BY updated_at, device_id, started_at
           LIMIT ${BATCH}`;
         if (!rows.length) break;
@@ -129,8 +127,8 @@ export async function internalStatus(): Promise<InternalStatus> {
   const s = (await getKv<Partial<InternalStatus>>(STATUS)) ?? {};
   const cursor = await getKv<Cursor>(CURSOR);
   const [{ pending }] = await sql<{ pending: number }[]>`
-    SELECT count(*)::int AS pending FROM battery_runs
-    ${cursor ? sql`WHERE (updated_at, device_id, started_at) > (${cursor.updatedAt}::text::timestamptz, ${cursor.deviceId}, ${cursor.startedAt}::text::timestamptz)` : sql``}`;
+    SELECT count(*) AS pending FROM battery_runs
+    ${cursor ? sql`WHERE (updated_at, device_id, started_at) > (${cursor.updatedAt}, ${cursor.deviceId}, ${cursor.startedAt})` : sql``}`;
   return {
     configured: !!internal,
     url: internal?.url ?? null,

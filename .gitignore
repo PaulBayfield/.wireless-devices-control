@@ -14,7 +14,7 @@ npm-debug.log*
 logs/
 *.log
 
-# Local Postgres for development (npm --prefix server run db:dev)
+# The dev server's SQLite database
 server/data/
 
 # --- Desktop app (Tauri) ---

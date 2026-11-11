@@ -22,7 +22,8 @@ const list = (name: string) =>
 
 export const PUBLIC_URL = required("PUBLIC_URL").replace(/\/+$/, "");
 export const PORT = Number(process.env.PORT ?? 8830);
-export const DATABASE_URL = required("DATABASE_URL");
+/** The SQLite file (created with its folder if missing). */
+export const DATABASE_PATH = resolve(process.env.DATABASE_PATH ?? resolve(import.meta.dirname, "../data/devices.db"));
 export const DIST_DIR = resolve(process.env.DIST_DIR ?? resolve(import.meta.dirname, "../../dist"));
 export const SECURE_COOKIES = PUBLIC_URL.startsWith("https://");
 

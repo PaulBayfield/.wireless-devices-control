@@ -10,7 +10,7 @@
   [![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](LICENSE)
   [![React](https://img.shields.io/badge/React-19-61dafb)](https://react.dev)
   [![Node](https://img.shields.io/badge/Node-24-339933)](https://nodejs.org)
-  [![Postgres](https://img.shields.io/badge/PostgreSQL-17-336791)](https://www.postgresql.org)
+  [![SQLite](https://img.shields.io/badge/SQLite-3-003b57)](https://www.sqlite.org)
   [![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org)
   [![Live](https://img.shields.io/badge/live-devices.bayfield.dev-f5b83d)](https://devices.bayfield.dev)
 </div>
@@ -76,7 +76,7 @@ flowchart LR
     D["Bose / Logitech / phone"] <-->|"BMAP, HID++, Phone Link"| A["Agent<br/>(Python, local API)"]
     APP["Devices app<br/>(web or desktop)"] -->|"settings, live readings"| A
   end
-  A -->|"heartbeat: devices + battery runs"| S["devices.bayfield.dev<br/>(Hono + Postgres)"]
+  A -->|"heartbeat: devices + battery runs"| S["devices.bayfield.dev<br/>(Hono + SQLite)"]
   APP -->|"every computer's data"| S
   S -->|"every few minutes"| I["internal.bayfield.dev"]
 ```
@@ -84,7 +84,7 @@ flowchart LR
 | Component | Folder | Runs | Role |
 |---|---|---|---|
 | Agent | `agent/` | On each computer with devices | Polls the devices, keeps their history (SQLite, the offline queue), sends it to the server after every poll, controls the devices through its local API |
-| Server | `server/` | Docker, behind the reverse proxy | Gathers every computer's devices and history, sign-in, API keys, copy to internal.bayfield.dev |
+| Server | `server/` | Docker, behind the reverse proxy | Gathers every computer's devices and history in a SQLite file, sign-in, API keys, copy to internal.bayfield.dev |
 | Web app | `src/` | Served by the server | The interface |
 | Desktop app | `src-tauri/` | Windows | The web app in a window, with a tray icon and the API key in the credential store |
 
@@ -96,8 +96,8 @@ The agent only connects out: nothing to open on your router. Devices are never c
 | Layer | Technology |
 |---|---|
 | Web app | React 19, TypeScript 7, Vite 8 |
-| Server | Node 24 running TypeScript directly, Hono 4, postgres.js |
-| Database | PostgreSQL 17 (server), SQLite (agent history) |
+| Server | Node 24 running TypeScript directly, Hono 4 |
+| Database | SQLite: Node's built-in `node:sqlite` on the server, the agent's history |
 | Sign-in | OIDC with Authentik (authorization code + PKCE) |
 | Agent | Python 3.14, Sanic, hidapi |
 | Desktop | Tauri 2 (Rust) |
@@ -126,7 +126,7 @@ The server is configured in `server/.env` (copy `server/.env.example`):
 | Variable | Description |
 |---|---|
 | `PUBLIC_URL` | Where the app is reachable, e.g. `https://devices.bayfield.dev` |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_PATH` | The SQLite file (`server/data/devices.db`; `/data/devices.db` in the image) |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Authentik provider (redirect URI `${PUBLIC_URL}/api/auth/oidc/callback`) |
 | `OIDC_ALLOWED_GROUPS`, `OIDC_ADMIN_GROUPS` | Who may sign in, who is admin |
 | `DEV_LOGIN_USER` | Local development only: sign in without Authentik (ignored unless `PUBLIC_URL` is localhost) |
@@ -148,8 +148,7 @@ The agent is configured in `agent/.env` (copy `agent/.env.example`):
 
 ```sh
 cp server/.env.example server/.env     # PUBLIC_URL=http://localhost:8830, DEV_LOGIN_USER=demo
-npm --prefix server run db:dev         # local embedded Postgres
-npm run server                         # API on :8830
+npm run server                         # API on :8830 (creates server/data/devices.db)
 npm run dev                            # web app on :1470
 cd agent && uv run __main__.py serve   # the agent, on the computer with the devices
 npm run tauri dev                      # the desktop app
@@ -262,10 +261,11 @@ devices.bayfield.dev/
 The image holds the web app and the server; the agent runs natively on each computer (Bluetooth radio, USB receiver).
 
 ```sh
-cp .env.example .env                 # POSTGRES_PASSWORD
 cp server/.env.example server/.env   # PUBLIC_URL, OIDC_*, INTERNAL_*
 docker compose up -d
 ```
+
+The whole database is one SQLite file in the `/data` volume: a backup is a copy of it (`sqlite3 devices.db ".backup copy.db"` while it runs).
 
 Pushing to `main` publishes `ghcr.io/paulbayfield/devices.bayfield.dev` (`latest` and the version) and a GitHub release when the version is new. Pushing a `v*` tag builds the Windows desktop installers and attaches them to that version's release. Put the server behind the reverse proxy at `https://devices.bayfield.dev → localhost:8830`.
 
@@ -312,7 +312,7 @@ Nothing talks to the phone. Phone Link keeps the linked phone's status on disk f
 | Dependency / protocol | Used for |
 |---|---|
 | [React](https://react.dev), [Vite](https://vite.dev) | The web app |
-| [Hono](https://hono.dev), [postgres.js](https://github.com/porsager/postgres) | The server |
+| [Hono](https://hono.dev), SQLite | The server |
 | [Tauri](https://tauri.app) | The desktop app |
 | [Sanic](https://sanic.dev), [hidapi](https://github.com/trezor/cython-hidapi) | The agent's API, the Logitech receiver |
 | [model-viewer](https://modelviewer.dev) | The 3D mouse |

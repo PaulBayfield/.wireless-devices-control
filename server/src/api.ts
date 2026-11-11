@@ -215,7 +215,7 @@ api.get("/sessions", requireSession, async (c) => {
 api.delete("/sessions/:id", async (c) => {
   const ref = c.req.param("id")!;
   if (!/^[0-9a-f]{16}$/.test(ref)) throw bad();
-  await sql`DELETE FROM sessions WHERE user_id = ${c.get("user").id} AND left(id, 16) = ${ref}`;
+  await sql`DELETE FROM sessions WHERE user_id = ${c.get("user").id} AND substr(id, 1, 16) = ${ref}`;
   return c.json({ ok: true });
 });
 
@@ -228,7 +228,7 @@ api.get("/keys", requireSession, async (c) => {
 
 api.post("/keys", async (c) => {
   const name = str((await body(c)).name, 80) || "API key";
-  const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM api_keys WHERE user_id = ${c.get("user").id}`;
+  const [{ count }] = await sql<{ count: number }[]>`SELECT count(*) AS count FROM api_keys WHERE user_id = ${c.get("user").id}`;
   if (count >= 50) throw bad("Delete an old key first");
   const { id, key } = await createKey("user", name, { userId: c.get("user").id });
   return c.json({ id, name, key }, 201);
