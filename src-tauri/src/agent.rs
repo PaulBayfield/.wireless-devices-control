@@ -1,4 +1,6 @@
-//! The agent (agent/ in this repository, built into one executable and bundled as a sidecar).
+//! The agent (agent/ in this repository), built by PyInstaller into a folder that is installed
+//! next to the app (agent/devices-agent.exe): started from there, it doesn't unpack itself into
+//! %TEMP% at every launch, which behavioural antivirus engines take for a trojan.
 //!
 //! The app starts it when it starts, restarts it if it stops, and talks to it on its stdin and
 //! stdout in JSON lines (see agent/src/agent/ipc.py): requests from the webview go through the
@@ -11,9 +13,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
+use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -25,6 +30,8 @@ const KEYRING_LINK: &str = "agent-link";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// Wait before starting the agent again after it stopped.
 const RESTART_DELAY: Duration = Duration::from_secs(5);
+/// agent.log starts over past this size.
+const LOG_MAX_BYTES: u64 = 2 * 1024 * 1024;
 
 /// This computer's link to the server: where to report, and the agent key to do it with.
 #[derive(Serialize, Deserialize, Clone)]
@@ -42,6 +49,8 @@ pub struct AgentState {
     next_id: AtomicU64,
     running: AtomicBool,
     quitting: AtomicBool,
+    /// What the agent writes on stderr (its log), for troubleshooting.
+    log: Mutex<Option<File>>,
 }
 
 fn err(e: impl std::fmt::Display) -> String {
@@ -80,16 +89,16 @@ pub fn start(app: &AppHandle) {
                     while let Some(event) = events.recv().await {
                         match event {
                             CommandEvent::Stdout(line) => on_line(&app, &line),
-                            CommandEvent::Stderr(line) => eprintln!("[agent] {}", String::from_utf8_lossy(&line).trim_end()),
+                            CommandEvent::Stderr(line) => log(&app, &String::from_utf8_lossy(&line)),
                             CommandEvent::Terminated(status) => {
-                                eprintln!("[agent] stopped: {status:?}");
+                                log(&app, &format!("[app] the agent stopped: {status:?}"));
                                 break;
                             }
                             _ => {}
                         }
                     }
                 }
-                Err(e) => eprintln!("[agent] could not start: {e}"),
+                Err(e) => log(&app, &format!("[app] could not start the agent: {e}")),
             }
             let state = app.state::<AgentState>();
             state.running.store(false, Ordering::Relaxed);
@@ -107,14 +116,36 @@ pub fn start(app: &AppHandle) {
     });
 }
 
+/// Appends a line to agent.log (in the app's data folder, next to the agent's history).
+fn log(app: &AppHandle, line: &str) {
+    let line = line.trim_end();
+    eprintln!("[agent] {line}");
+    if let Some(file) = app.state::<AgentState>().log.lock().unwrap().as_mut() {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
+fn open_log(dir: &std::path::Path) -> Option<File> {
+    let path = dir.join("agent.log");
+    let too_big = std::fs::metadata(&path).map(|m| m.len() > LOG_MAX_BYTES).unwrap_or(false);
+    OpenOptions::new().create(true).append(!too_big).write(true).truncate(too_big).open(path).ok()
+}
+
 fn spawn(app: &AppHandle) -> Result<tauri::async_runtime::Receiver<CommandEvent>, String> {
-    // Its history and logs live with the app's data.
+    // Its history and log live with the app's data.
     let dir = app.path().app_data_dir().map_err(err)?.join("agent");
     std::fs::create_dir_all(&dir).map_err(err)?;
+    *app.state::<AgentState>().log.lock().unwrap() = open_log(&dir);
+    let exe = app
+        .path()
+        .resolve(if cfg!(windows) { "agent/devices-agent.exe" } else { "agent/devices-agent" }, BaseDirectory::Resource)
+        .map_err(err)?;
+    if !exe.exists() {
+        return Err(format!("{} is missing: build it with `npm run agent:build`", exe.display()));
+    }
     let mut command = app
         .shell()
-        .sidecar("devices-agent")
-        .map_err(err)?
+        .command(exe.to_string_lossy().to_string())
         .args(["serve", "--ipc"])
         .current_dir(&dir)
         .env("HISTORY_PATH", dir.join("battery.db").to_string_lossy().to_string())
