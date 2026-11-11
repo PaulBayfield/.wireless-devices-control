@@ -44,7 +44,7 @@ Every device protocol here was **reverse engineered** and is spoken directly to 
 
 Devices replaces the Bose Music app and Logitech G HUB for what I actually use them for: seeing how much battery is left, and changing a setting now and then. It is the same app as my other `*.bayfield.dev` apps ([notes](https://notes.bayfield.dev), [calendar](https://calendar.bayfield.dev), [llip](https://llip.bayfield.dev)…): same header, sidebar, side panel, settings and update check, on the web and as a desktop app.
 
-- **An agent on each computer** the devices are connected to talks to them in their own protocol, keeps their battery history, and exposes a local API to control them.
+- **An agent on each computer** the devices are connected to talks to them in their own protocol and keeps their battery history. It comes inside the desktop app, which starts it and controls the devices through it.
 - **A server** keeps the data of every computer, so the history follows you when you change computers, and copies it to [internal.bayfield.dev](https://github.com/PaulBayfield/internal.bayfield.dev).
 - **The app** (web and desktop) shows every device from the server, and changes settings through the agent of the computer it runs on.
 
@@ -54,8 +54,8 @@ Key features:
 - Bose settings: volume, EQ, noise cancellation modes, wind block, multipoint, voice prompts, sidetone, name; play, pause, pairing mode, power off
 - Logitech settings: DPI, report rate, lighting per zone (shown live on a 3D model), host or onboard profile mode
 - A linked Android phone's battery, read from what Phone Link already fetched
-- Live readings every second while the app is open, 30–60 s otherwise
-- Desktop app (Windows) with a tray icon, close-to-tray and start at sign-in
+- Live readings every second while the desktop app is open, pushed by the agent; 30–60 s otherwise
+- Desktop app (Windows) with the agent inside: one installer per computer, linked from the app, kept running from the tray and started at sign-in
 
 
 ## 🎧 • Supported Devices
@@ -73,22 +73,23 @@ Key features:
 ```mermaid
 flowchart LR
   subgraph PC["Each computer"]
-    D["Bose / Logitech / phone"] <-->|"BMAP, HID++, Phone Link"| A["Agent<br/>(Python, local API)"]
-    APP["Devices app<br/>(web or desktop)"] -->|"settings, live readings"| A
+    D["Bose / Logitech / phone"] <-->|"BMAP, HID++, Phone Link"| A["Agent<br/>(Python)"]
+    APP["Desktop app<br/>(Tauri)"] <-->|"stdin/stdout: settings, live readings"| A
   end
   A -->|"heartbeat: devices + battery runs"| S["devices.bayfield.dev<br/>(Hono + SQLite)"]
   APP -->|"every computer's data"| S
+  WEB["Web app"] -->|"every computer's data"| S
   S -->|"every few minutes"| I["internal.bayfield.dev"]
 ```
 
 | Component | Folder | Runs | Role |
 |---|---|---|---|
-| Agent | `agent/` | On each computer with devices | Polls the devices, keeps their history (SQLite, the offline queue), sends it to the server after every poll, controls the devices through its local API |
+| Agent | `agent/` | On each computer with devices, started by the desktop app | Polls the devices, keeps their history (SQLite, the offline queue), sends it to the server after every poll, runs what the desktop app asks |
 | Server | `server/` | Docker, behind the reverse proxy | Gathers every computer's devices and history in a SQLite file, sign-in, API keys, copy to internal.bayfield.dev |
-| Web app | `src/` | Served by the server | The interface |
-| Desktop app | `src-tauri/` | Windows | The web app in a window, with a tray icon and the API key in the credential store |
+| Web app | `src/` | Served by the server | The interface: every computer's data, from anywhere |
+| Desktop app | `src-tauri/` | Windows | The web app in a window, with the agent inside: starts it, keeps it running from the tray, links the computer, changes the devices' settings |
 
-The agent only connects out: nothing to open on your router. Devices are never controlled through the server, only through the agent of the computer they are connected to.
+The agent opens no port: it connects out to the server, and the desktop app talks to it on its stdin and stdout. Devices are never controlled through the server, only through the desktop app of the computer they are connected to; the web app shows the data.
 
 
 ## 🛠️ • Tech Stack
@@ -99,7 +100,7 @@ The agent only connects out: nothing to open on your router. Devices are never c
 | Server | Node 24 running TypeScript directly, Hono 4 |
 | Database | SQLite: Node's built-in `node:sqlite` on the server, the agent's history |
 | Sign-in | OIDC with Authentik (authorization code + PKCE) |
-| Agent | Python 3.14, Sanic, hidapi |
+| Agent | Python 3.14, hidapi, built into one executable with PyInstaller |
 | Desktop | Tauri 2 (Rust) |
 
 
@@ -134,15 +135,13 @@ The server is configured in `server/.env` (copy `server/.env.example`):
 | `HISTORY_DAYS` | Days of battery history kept on the server (365) |
 | `INTERNAL_URL`, `INTERNAL_API_KEY`, `INTERNAL_SYNC_MINUTES` | Copy to internal.bayfield.dev (a key with the `devices:write` scope) |
 
-The agent is configured in `agent/.env` (copy `agent/.env.example`):
+The desktop app configures its agent itself. Run on its own (a computer without the desktop app), the agent reads `agent/.env` (copy `agent/.env.example`):
 
 | Variable | Description |
 |---|---|
-| `API_HOST`, `API_PORT`, `API_TOKEN` | The local API the app controls the devices through (token: 32+ characters) |
 | `CENTRAL_URL`, `AGENT_KEY`, `AGENT_NAME` | The server and this computer's key, created in Settings → Computers |
-| `POLL_INTERVAL`, `POLL_INTERVAL_MIN`, `POLL_INTERVAL_ACTIVE` | Poll rate: steady (60 s), while a battery moves (30 s), while the app is open (1 s) |
+| `POLL_INTERVAL`, `POLL_INTERVAL_MIN`, `POLL_INTERVAL_ACTIVE` | Poll rate: steady (60 s), while a battery moves (30 s), while the desktop app is open (1 s) |
 | `HISTORY_PATH`, `HISTORY_DAYS` | Local battery history (SQLite) |
-| `CORS_ORIGINS` | Origins allowed to call the local API (the web app, the desktop app) |
 
 ### Running Locally
 
@@ -150,11 +149,13 @@ The agent is configured in `agent/.env` (copy `agent/.env.example`):
 cp server/.env.example server/.env     # PUBLIC_URL=http://localhost:8830, DEV_LOGIN_USER=demo
 npm run server                         # API on :8830 (creates server/data/devices.db)
 npm run dev                            # web app on :1470
-cd agent && uv run __main__.py serve   # the agent, on the computer with the devices
-npm run tauri dev                      # the desktop app
+npm run agent:build                    # the agent as one executable, for the desktop app
+npm run tauri dev                      # the desktop app, which starts the agent
 ```
 
-Then, in the app: Settings → Computers → **Add a computer**, put the key in `agent/.env` (`CENTRAL_URL`, `AGENT_KEY`) and restart the agent; Settings → **This computer** with the agent's address and `API_TOKEN` to control its devices.
+In the desktop app: connect with a personal API key from the web app (Settings → Security → API keys), then Settings → **This computer** → **Link this computer**. A browser page opens; approve it while signed in as an admin, and the app gets the computer's agent key on its own.
+
+A computer without the desktop app can still run the agent on its own: Settings → Computers → **Add a computer** in the web app, the key in `agent/.env` (`CENTRAL_URL`, `AGENT_KEY`), then `cd agent && uv run __main__.py serve`.
 
 
 ## 🔐 • Sign-in & Security
@@ -164,7 +165,8 @@ Then, in the app: Settings → Computers → **Add a computer**, put the key in 
 - **Personal API keys** (`dvc_…`, Settings → Security) are for the desktop app and scripts, and are **read-only**: they read the devices and their history, and can't change anything. Creating keys, adding computers and managing users need a signed-in session, and so does merely listing keys, sessions or users.
 - **Agent keys** (`dva_…`, one per computer) can only report that computer's devices, and nothing else.
 - Keys and session cookies are random tokens; only their SHA-256 is stored. Cookie-authenticated writes must come from the app itself (`Origin` check).
-- The agent's local API needs its own token, and only answers the app's origins (CORS).
+- The agent opens no port: only the desktop app that started it can talk to it (stdin/stdout).
+- Linking a computer: the desktop app opens `/link` with the SHA-256 of a secret it keeps; a signed-in admin approves; the app claims the agent key with the secret. The key is created at that moment and never stored, and an approval nobody claims expires after 10 minutes.
 - The desktop app keeps the server address and its key in the OS credential store.
 - internal.bayfield.dev receives the data with a key that can only write it (`devices:write`), not read it back. The Bluetooth address is not sent.
 
@@ -175,7 +177,7 @@ The agent adapts its poll rate, for accurate data without draining the devices o
 
 | When | Every |
 |---|---|
-| The app is open on this computer | 1 s (`POLL_INTERVAL_ACTIVE`), discovery every 30 s |
+| The desktop app is open and visible on this computer | 1 s (`POLL_INTERVAL_ACTIVE`), discovery every 30 s |
 | A battery is charging, at 20 % or less, or just changed | 30 s (`POLL_INTERVAL_MIN`) |
 | Everything is steady | 60 s (`POLL_INTERVAL`) |
 
@@ -205,7 +207,7 @@ In `agent/`:
 uv run __main__.py                    # battery of every device (the default)
 uv run __main__.py battery --json     # the same, in the shape the API uses
 uv run __main__.py devices            # everything discovery finds, every vendor
-uv run __main__.py serve              # start the agent (local API + reports)
+uv run __main__.py serve              # run the agent on its own (poll, history, reports)
 uv run __main__.py help
 ```
 
@@ -244,7 +246,7 @@ uv run __main__.py logitech features                # dump the HID++ feature tab
 devices.bayfield.dev/
 ├── agent/                 # Python agent, run on each computer with devices
 │   ├── src/devices/       # Bose (BMAP), Logitech (HID++), Phone Link
-│   ├── src/api/           # local API (Sanic), polling, history, link to the server
+│   ├── src/agent/         # polling, history, link to the server, channel to the desktop app
 │   └── src/cli/           # command line
 ├── server/src/            # Hono server: auth, app API, agent API, internal.bayfield.dev sync
 ├── src/                   # React app: shared shell + devices/ (cards, history, controls)
@@ -314,7 +316,7 @@ Nothing talks to the phone. Phone Link keeps the linked phone's status on disk f
 | [React](https://react.dev), [Vite](https://vite.dev) | The web app |
 | [Hono](https://hono.dev), SQLite | The server |
 | [Tauri](https://tauri.app) | The desktop app |
-| [Sanic](https://sanic.dev), [hidapi](https://github.com/trezor/cython-hidapi) | The agent's API, the Logitech receiver |
+| [hidapi](https://github.com/trezor/cython-hidapi), [PyInstaller](https://pyinstaller.org) | The Logitech receiver, the agent's executable |
 | [model-viewer](https://modelviewer.dev) | The 3D mouse |
 | [Lucide](https://lucide.dev) | Icons |
 | Bose BMAP (reverse engineered), Logitech HID++ 2.0, Microsoft Phone Link | Talking to the devices |
