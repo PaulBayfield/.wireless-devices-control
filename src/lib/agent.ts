@@ -36,9 +36,15 @@ export const applySettings = (id: string, changes: SettingsChanges) => call<Sett
 export const runAction = (id: string, action: string, params: Record<string, unknown> = {}) => call<null>("action", { device_id: id, action, params });
 export const refreshAgent = () => call<unknown>("refresh");
 
-/** A device as this computer's agent sees it right now. */
+/** A device as this computer's agent sees it right now (the agent's DeviceState.to_dict()). */
 export interface LocalDevice {
   id: string;
+  vendor: string;
+  key: string;
+  kind: string;
+  model: string;
+  name: string;
+  address: string;
   connected: boolean;
   battery: Battery | null;
   battery_updated_at: string | null;

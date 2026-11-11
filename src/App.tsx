@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, isTauri, setConnection, type Me, type Overview, type ServerInfo } from "./lib/api";
+import { api, ApiError, isTauri, setConnection, type Device, type Me, type Overview, type ServerInfo } from "./lib/api";
 import { refreshAgent, useLocalAgent } from "./lib/agent";
 import { AppContext, matches, sortDevices, type AppContextValue, type ListFilter, type SettingsPage } from "./lib/app";
 import { MOBILE_QUERY, invalidate, useApi, useMediaQuery } from "./lib/hooks";
@@ -90,13 +90,23 @@ function Shell({ me, setMe, router, onSignedOut }: { me: Me; setMe: (me: Me) => 
   const list: ListFilter = (["low", "charging"] as const).find((l) => l === router.query.filter) ?? "all";
   const hostId = r.name === "devices" ? r.host : undefined;
   // This computer's devices: the agent's live readings (every second while the app is open)
-  // over what the server last heard.
+  // over what the server last heard, and the ones the server doesn't know yet (computer not
+  // linked, or its report hasn't arrived).
   const overview = useMemo(() => {
     const data = overviewReq.data;
     if (!data || !local.devices) return data;
+    const known = new Set(data.devices.map((d) => d.id));
+    const here = local.info?.link ? data.hosts.find((h) => h.id === local.info!.link!.host_id) : undefined;
+    const onlyHere: Device[] = [...local.devices.values()]
+      .filter((d) => !known.has(d.id))
+      .map((d) => ({
+        ...d,
+        first_seen_at: null,
+        host: { id: here?.id ?? "this-computer", name: here?.name ?? local.info?.computer ?? "This computer", online: true },
+      }));
     return {
       ...data,
-      devices: data.devices.map((d) => {
+      devices: [...data.devices.map((d) => {
         const here = local.devices!.get(d.id);
         if (!here) return d;
         return {
@@ -107,9 +117,9 @@ function Shell({ me, setMe, router, onSignedOut }: { me: Me; setMe: (me: Me) => 
           last_seen_at: here.last_seen_at ?? d.last_seen_at,
           error: here.error,
         };
-      }),
+      }), ...onlyHere],
     };
-  }, [overviewReq.data, local.devices]);
+  }, [overviewReq.data, local.devices, local.info]);
   const visible = useMemo(
     () => sortDevices((overview?.devices ?? []).filter((d) => matches(d, list, hostId) && (settings.showOffline || d.connected)), settings.sort),
     [overview, list, hostId, settings.showOffline, settings.sort],

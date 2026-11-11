@@ -14,7 +14,7 @@ export function Dashboard() {
   const polled = host ? host.polled_at : overview.polled_at;
   const interval = Math.min(...hosts.map((h) => h.poll_interval), Infinity);
 
-  if (overview.hosts.length === 0) {
+  if (overview.hosts.length === 0 && visible.length === 0) {
     return (
       <div className="page">
         <div className="empty-state">
