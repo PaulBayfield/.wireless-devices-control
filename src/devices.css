@@ -704,6 +704,13 @@
   cursor: pointer;
 }
 
+/* ---------- Sidebar ---------- */
+
+/* A little air between the computers and the devices below them. */
+.sidebar-computers {
+  margin-bottom: 12px;
+}
+
 /* ---------- Side panel ---------- */
 
 .panel-row {

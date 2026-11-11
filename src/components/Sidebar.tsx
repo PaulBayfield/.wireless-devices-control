@@ -55,7 +55,7 @@ export function Sidebar() {
       {/* Only the lists scroll; the header stays put. */}
       <div className="sidebar-scroll">
         {(overview?.hosts.length ?? 0) > 0 && (
-          <div className="sidebar-group">
+          <div className="sidebar-group sidebar-computers">
             <div className="sidebar-group-title">{t("computers")}</div>
             {overview!.hosts.map((h) => (
               <button key={h.id} className={`sidebar-row${hostFilter === h.id ? " active" : ""}`} onClick={() => navigate({ name: "devices", host: h.id })}>
