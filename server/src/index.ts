@@ -96,11 +96,13 @@ if (indexHtml) {
   console.warn(`No web build at ${DIST_DIR}; only the API is served. Run \`npm run build\` in the project root.`);
 }
 
-// Once an hour: expired sessions and sign-in attempts, history past its retention.
+// Once an hour: expired sessions, sign-in attempts and link approvals, history past its retention.
 setInterval(
   () => {
     void sql`DELETE FROM sessions WHERE expires_at < now()`.catch(() => {});
     void sql`DELETE FROM oidc_states WHERE expires_at < now()`.catch(() => {});
+    // Computers approved for linking but never claimed by their desktop app.
+    void sql`DELETE FROM hosts WHERE id IN (SELECT host_id FROM link_grants WHERE expires_at < now())`.catch(() => {});
     void sql`DELETE FROM battery_runs WHERE ended_at < ${new Date(Date.now() - HISTORY_DAYS * 86_400_000)}`.catch(() => {});
   },
   60 * 60_000,

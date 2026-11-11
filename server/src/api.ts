@@ -11,7 +11,8 @@ import { sql } from "./db.ts";
 import { createKey, requireAdmin, requireSession, requireUser, type AppEnv } from "./auth.ts";
 import { hostOnline } from "./hosts.ts";
 import { maxGap, readHistory } from "./history.ts";
-import { HttpError, bad, body, str } from "./http.ts";
+import { HttpError, bad, body, rateLimit, str } from "./http.ts";
+import { sha256 } from "./crypto.ts";
 import { internalStatus, syncInternal } from "./internal.ts";
 import { APP_VERSION, UPDATE_CHECK, internal, oidc } from "./config.ts";
 import { updateStatus } from "./updates.ts";
@@ -176,6 +177,52 @@ api.patch("/hosts/:id", requireAdmin, async (c) => {
   const [row] = await sql`UPDATE hosts SET name = ${name}, updated_at = now() WHERE id = ${c.req.param("id")!} RETURNING id`;
   if (!row) throw new HttpError(404, "Unknown computer");
   return c.json({ ok: true });
+});
+
+// --- Linking a computer from the desktop app ---
+
+const LINK_MINUTES = 10;
+
+/**
+ * The browser side: a signed-in admin approves the computer the desktop app asked to link
+ * (/link?challenge=…&name=…). Creates the computer; its key is created when the app claims it.
+ */
+api.post("/link", requireSession, requireAdmin, async (c) => {
+  const b = await body(c);
+  const challenge = str(b.challenge, 64).toLowerCase();
+  const name = str(b.name, 80);
+  if (!/^[0-9a-f]{64}$/.test(challenge)) throw bad("This link is malformed: start again from the desktop app");
+  if (!name) throw bad("Give the computer a name");
+  const [taken] = await sql`SELECT 1 FROM link_grants WHERE challenge = ${challenge}`;
+  if (taken) throw new HttpError(409, "This computer is already approved: go back to the desktop app");
+  const id = crypto.randomUUID();
+  await sql.begin(async (tx) => {
+    await tx`INSERT INTO hosts (id, name) VALUES (${id}, ${name})`;
+    await tx`
+      INSERT INTO link_grants (challenge, user_id, host_id, expires_at)
+      VALUES (${challenge}, ${c.get("user").id}, ${id}, ${new Date(Date.now() + LINK_MINUTES * 60_000)})`;
+  });
+  return c.json({ id, name }, 201);
+});
+
+/**
+ * The desktop side, with its (read-only) API key: polls until the computer is approved, then gets
+ * its agent key, once. The secret proves it is the app that asked; the approval must be by the
+ * owner of the key.
+ */
+api.get("/link/claim", async (c) => {
+  rateLimit(c, "link-claim", 120, 60_000);
+  const secret = c.req.header("X-Link-Secret") ?? "";
+  if (secret.length < 32) throw bad("Send the link secret as X-Link-Secret");
+  const [grant] = await sql<{ userId: string; hostId: string; name: string }[]>`
+    SELECT g.user_id, g.host_id, h.name FROM link_grants g JOIN hosts h ON h.id = g.host_id
+    WHERE g.challenge = ${sha256(secret)} AND g.expires_at > ${new Date()}`;
+  if (!grant) throw new HttpError(404, "Not approved yet");
+  if (grant.userId !== c.get("user").id) throw new HttpError(403, "Approve the computer with the account the desktop app is connected with");
+  await sql`DELETE FROM link_grants WHERE host_id = ${grant.hostId}`;
+  await sql`DELETE FROM api_keys WHERE host_id = ${grant.hostId}`;
+  const { key } = await createKey("agent", grant.name, { hostId: grant.hostId });
+  return c.json({ hostId: grant.hostId, name: grant.name, key });
 });
 
 /** A new agent key for the computer; the old one stops working at once. */

@@ -262,6 +262,18 @@ const MIGRATIONS: string[] = [
 
   CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `,
+  /* 2: linking a computer from the desktop app, approved in the browser */ `
+  -- The desktop app opens /link with the SHA-256 of a secret it keeps (the challenge); a signed-in
+  -- admin approves, which creates the computer; the app then claims the agent key with the secret.
+  -- The key is only created when claimed, so it is never stored. Unclaimed approvals expire.
+  CREATE TABLE link_grants (
+    challenge TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    host_id TEXT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL DEFAULT ${NOW},
+    expires_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 /** Applies the migrations the file doesn't have yet (PRAGMA user_version). Never edit an applied one: append. */
